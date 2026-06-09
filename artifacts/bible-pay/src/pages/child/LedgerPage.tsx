@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useLocation } from "wouter";
-import { TrendingUp, TrendingDown, Wallet, Plus } from "lucide-react";
+import { TrendingUp, TrendingDown, Plus } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAppContext, Transaction } from "@/context/AppContext";
 import { BottomNav } from "@/components/BottomNav";
@@ -11,7 +11,7 @@ function groupByDate(transactions: Transaction[]): { label: string; items: Trans
   const map = new Map<string, Transaction[]>();
 
   for (const tx of transactions) {
-    const d = new Date(tx.date);
+    const d = new Date(tx.createdAt);
     const today = new Date();
     const yesterday = new Date(today.getTime() - 86400000);
 
@@ -36,48 +36,41 @@ const FILTERS: Filter[] = ["전체", "번 돈", "쓴 돈"];
 
 export default function LedgerPage() {
   const [_, setLocation] = useLocation();
-  const { selectedChildId, children, transactions } = useAppContext();
+  const { currentChild, transactions } = useAppContext();
   const [filter, setFilter] = useState<Filter>("전체");
   const [spendOpen, setSpendOpen] = useState(false);
 
-  const child = children.find(c => c.id === selectedChildId);
-
   React.useEffect(() => {
-    if (!child) setLocation("/login");
-  }, [child, setLocation]);
+    if (!currentChild) setLocation("/login");
+  }, [currentChild, setLocation]);
 
-  if (!child) return null;
+  if (!currentChild) return null;
 
   const childTxs = transactions
-    .filter(t => t.childId === child.id)
     .filter(t => {
       if (filter === "번 돈") return t.amount > 0;
       if (filter === "쓴 돈") return t.amount < 0;
       return true;
     })
-    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
-  const allChildTxs = transactions.filter(t => t.childId === child.id);
-  const totalEarned  = allChildTxs.filter(t => t.amount > 0).reduce((s, t) => s + t.amount, 0);
-  const totalSpent   = allChildTxs.filter(t => t.amount < 0).reduce((s, t) => s + Math.abs(t.amount), 0);
+  const totalEarned = transactions.filter(t => t.amount > 0).reduce((s, t) => s + t.amount, 0);
+  const totalSpent = transactions.filter(t => t.amount < 0).reduce((s, t) => s + Math.abs(t.amount), 0);
 
   const grouped = groupByDate(childTxs);
 
   return (
     <div className="min-h-[100dvh] bg-gray-50 pb-28">
-      {/* Hero Header */}
       <div className="bg-white px-6 pt-12 pb-6 shadow-[0_4px_24px_rgba(0,0,0,0.04)]">
         <h1 className="text-lg font-bold text-gray-900 text-center mb-5">용돈기입장</h1>
 
-        {/* Balance */}
         <div className="text-center mb-6">
           <p className="text-sm text-gray-400 font-medium mb-1">현재 잔액</p>
           <h2 className="text-4xl font-black text-gray-900">
-            ₩{child.balance.toLocaleString("ko-KR")}
+            ₩{currentChild.balance.toLocaleString("ko-KR")}
           </h2>
         </div>
 
-        {/* Stats row */}
         <div className="flex gap-3 mb-5">
           <div className="flex-1 bg-emerald-50 rounded-[18px] p-4 flex items-center gap-3">
             <div className="w-9 h-9 rounded-full bg-emerald-100 flex items-center justify-center">
@@ -99,7 +92,6 @@ export default function LedgerPage() {
           </div>
         </div>
 
-        {/* Spend CTA */}
         <motion.button
           whileTap={{ scale: 0.97 }}
           onClick={() => setSpendOpen(true)}
@@ -111,7 +103,6 @@ export default function LedgerPage() {
         </motion.button>
       </div>
 
-      {/* Filter Tabs */}
       <div className="px-6 pt-5 pb-2">
         <div className="flex gap-2">
           {FILTERS.map(f => (
@@ -119,9 +110,7 @@ export default function LedgerPage() {
               key={f}
               onClick={() => setFilter(f)}
               className={`px-4 py-2 rounded-full text-sm font-bold transition-all ${
-                filter === f
-                  ? "bg-gray-900 text-white shadow-sm"
-                  : "bg-white text-gray-500 border border-gray-200"
+                filter === f ? "bg-gray-900 text-white shadow-sm" : "bg-white text-gray-500 border border-gray-200"
               }`}
               data-testid={`filter-${f}`}
             >
@@ -131,7 +120,6 @@ export default function LedgerPage() {
         </div>
       </div>
 
-      {/* Transaction List */}
       <div className="px-6 pt-3 space-y-4">
         <AnimatePresence mode="wait">
           {grouped.length === 0 ? (
@@ -152,7 +140,6 @@ export default function LedgerPage() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: gi * 0.04 }}
               >
-                {/* Date label */}
                 <div className="flex items-center gap-3 mb-2 px-1">
                   <span className="text-xs font-bold text-gray-400 uppercase tracking-wide">{label}</span>
                   <div className="flex-1 h-px bg-gray-100" />
@@ -163,14 +150,13 @@ export default function LedgerPage() {
                   </span>
                 </div>
 
-                {/* Card */}
                 <div className="bg-white rounded-[20px] shadow-sm border border-gray-100 px-4 overflow-hidden">
                   {items.map(tx => (
                     <TransactionItem
                       key={tx.id}
                       description={tx.description}
                       amount={tx.amount}
-                      date={tx.date}
+                      date={tx.createdAt}
                       type={tx.type}
                     />
                   ))}
@@ -186,8 +172,8 @@ export default function LedgerPage() {
       <SpendModal
         open={spendOpen}
         onClose={() => setSpendOpen(false)}
-        childId={child.id}
-        balance={child.balance}
+        childId={currentChild.id}
+        balance={currentChild.balance}
       />
     </div>
   );

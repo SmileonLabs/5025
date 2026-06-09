@@ -1,27 +1,30 @@
-import React, { createContext, useState, useContext, ReactNode } from "react";
+import React, { createContext, useState, useContext, useCallback, useEffect, ReactNode } from "react";
+import { api } from "@/lib/api";
 
 export type Role = "parent" | "child" | null;
 
-export interface Parent {
+export interface ParentData {
+  id: number;
   name: string;
   email: string;
   balance: number;
 }
 
-export interface Child {
-  id: string;
+export interface ChildData {
+  id: number;
   name: string;
   age: number;
   balance: number;
   avatar: string;
+  parentId: number;
 }
 
 export type TransactionType = "mission" | "charge" | "spend";
 
 export interface Transaction {
-  id: string;
-  childId: string;
-  date: string;
+  id: number;
+  childId: number;
+  createdAt: string;
   amount: number;
   description: string;
   type: TransactionType;
@@ -35,149 +38,198 @@ export interface Mission {
   completed: boolean;
   dueDate: string;
   completedAt?: string;
-  childId?: string;
 }
+
+const INITIAL_MISSIONS: Mission[] = [
+  { id: "m1", title: "창세기 1장", verse: "태초에 하나님이 천지를 창조하시니라", reward: 500, completed: false, dueDate: "오늘" },
+  { id: "m2", title: "시편 23편", verse: "여호와는 나의 목자시니 내게 부족함이 없으리로다", reward: 300, completed: false, dueDate: "내일" },
+  { id: "m3", title: "요한복음 3:16", verse: "하나님이 세상을 이처럼 사랑하사 독생자를 주셨으니...", reward: 400, completed: false, dueDate: "이번 주" },
+];
 
 interface AppState {
   role: Role;
-  setRole: (role: Role) => void;
-  parent: Parent;
-  children: Child[];
-  selectedChildId: string | null;
-  setSelectedChildId: (id: string | null) => void;
+  loading: boolean;
+  parent: ParentData | null;
+  currentChild: ChildData | null;
+  children: ChildData[];
   transactions: Transaction[];
   missions: Mission[];
-  completeMission: (missionId: string, childId: string) => void;
-  chargeAllowance: (childId: string, amount: number) => void;
-  rewardChild: (childId: string, amount: number, description: string) => boolean;
-  spendAllowance: (childId: string, amount: number, purpose: string) => boolean;
+  // Auth actions
+  login: (email: string, password: string) => Promise<void>;
+  signup: (name: string, email: string, password: string) => Promise<void>;
+  logout: () => Promise<void>;
+  childLogin: (childId: number, pin: string) => Promise<void>;
+  // Child management
+  createChild: (name: string, age: number, avatar: string, pin: string) => Promise<void>;
+  deleteChild: (childId: number) => Promise<void>;
+  refreshChildren: () => Promise<void>;
+  // Transactions
+  completeMission: (missionId: string, childId: number) => Promise<void>;
+  chargeAllowance: (childId: number, amount: number) => Promise<void>;
+  spendAllowance: (childId: number, amount: number, purpose: string) => Promise<boolean>;
 }
-
-const initialMissions: Mission[] = [
-  { id: "m1", title: "창세기 1장", verse: "태초에 하나님이 천지를 창조하시니라", reward: 500, completed: false, dueDate: "오늘" },
-  { id: "m2", title: "시편 23편", verse: "여호와는 나의 목자시니 내게 부족함이 없으리로다", reward: 300, completed: true, dueDate: "어제" },
-  { id: "m3", title: "요한복음 3:16", verse: "하나님이 세상을 이처럼 사랑하사 독생자를 주셨으니...", reward: 400, completed: false, dueDate: "내일" }
-];
-
-const initialChildren: Child[] = [
-  { id: "c1", name: "김하은", age: 9, balance: 12500, avatar: "🌸" },
-  { id: "c2", name: "김도현", age: 7, balance: 8000, avatar: "⭐" }
-];
-
-const now = new Date();
-const yesterday = new Date(now.getTime() - 86400000);
-const twoDaysAgo = new Date(now.getTime() - 86400000 * 2);
-const threeDaysAgo = new Date(now.getTime() - 86400000 * 3);
-
-const initialTransactions: Transaction[] = [
-  { id: "t1", childId: "c1", date: now.toISOString(), amount: 500, description: "잠언 1장 퀴즈 완료 🎉", type: "mission" },
-  { id: "t2", childId: "c1", date: now.toISOString(), amount: -800, description: "문구점에서 연필 사기 ✏️", type: "spend" },
-  { id: "t3", childId: "c1", date: yesterday.toISOString(), amount: 5000, description: "용돈 채우기", type: "charge" },
-  { id: "t4", childId: "c1", date: yesterday.toISOString(), amount: -1500, description: "떡볶이 냠냠 🌶️", type: "spend" },
-  { id: "t5", childId: "c1", date: twoDaysAgo.toISOString(), amount: 300, description: "시편 23편 퀴즈 완료 🎉", type: "mission" },
-  { id: "t6", childId: "c1", date: threeDaysAgo.toISOString(), amount: -2000, description: "친구 생일 선물 🎁", type: "spend" },
-  { id: "t7", childId: "c2", date: now.toISOString(), amount: 300, description: "시편 23편 퀴즈 완료 🎉", type: "mission" },
-  { id: "t8", childId: "c2", date: yesterday.toISOString(), amount: 3000, description: "용돈 채우기", type: "charge" },
-  { id: "t9", childId: "c2", date: yesterday.toISOString(), amount: -500, description: "아이스크림 🍦", type: "spend" },
-];
 
 const AppContext = createContext<AppState | undefined>(undefined);
 
-export function AppProvider({ children }: { children: ReactNode }) {
+export function AppProvider({ children: reactChildren }: { children: ReactNode }) {
   const [role, setRole] = useState<Role>(null);
-  const [selectedChildId, setSelectedChildId] = useState<string | null>(null);
-  const [parentBalance, setParentBalance] = useState<number>(50000);
-  const [childrenState, setChildrenState] = useState<Child[]>(initialChildren);
-  const [transactions, setTransactions] = useState<Transaction[]>(initialTransactions);
-  const [missions, setMissions] = useState<Mission[]>(initialMissions);
+  const [loading, setLoading] = useState(true);
+  const [parent, setParent] = useState<ParentData | null>(null);
+  const [currentChild, setCurrentChild] = useState<ChildData | null>(null);
+  const [children, setChildren] = useState<ChildData[]>([]);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [missions, setMissions] = useState<Mission[]>(INITIAL_MISSIONS);
 
-  const parent: Parent = { name: "김부모", email: "parent@demo.com", balance: parentBalance };
+  const refreshChildren = useCallback(async () => {
+    try {
+      const data = await api.get<ChildData[]>("/children");
+      setChildren(data);
+    } catch {}
+  }, []);
 
-  const completeMission = (missionId: string, childId: string) => {
+  // Restore session on mount
+  useEffect(() => {
+    (async () => {
+      try {
+        const me = await api.get<{ role: "parent" | "child" } & ParentData & ChildData>("/auth/me");
+        if (me.role === "parent") {
+          setRole("parent");
+          setParent({ id: me.id, name: me.name, email: me.email, balance: me.balance });
+          const kids = await api.get<ChildData[]>("/children");
+          setChildren(kids);
+        } else if (me.role === "child") {
+          setRole("child");
+          setCurrentChild({ id: me.id, name: me.name, age: me.age, avatar: me.avatar, balance: me.balance, parentId: me.parentId });
+          const txs = await api.get<Transaction[]>("/transactions");
+          setTransactions(txs);
+        }
+      } catch {
+        // not logged in
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+  const login = async (email: string, password: string) => {
+    const data = await api.post<ParentData>("/auth/login", { email, password });
+    setParent(data);
+    setRole("parent");
+    setCurrentChild(null);
+    const kids = await api.get<ChildData[]>("/children");
+    setChildren(kids);
+  };
+
+  const signup = async (name: string, email: string, password: string) => {
+    const data = await api.post<ParentData>("/auth/signup", { name, email, password });
+    setParent(data);
+    setRole("parent");
+    setCurrentChild(null);
+    setChildren([]);
+  };
+
+  const logout = async () => {
+    await api.post("/auth/logout", {});
+    setRole(null);
+    setParent(null);
+    setCurrentChild(null);
+    setChildren([]);
+    setTransactions([]);
+    setMissions(INITIAL_MISSIONS);
+  };
+
+  const childLogin = async (childId: number, pin: string) => {
+    const data = await api.post<ChildData>("/auth/child-login", { childId, pin });
+    setCurrentChild(data);
+    setRole("child");
+    setParent(null);
+    setChildren([]);
+    const txs = await api.get<Transaction[]>("/transactions");
+    setTransactions(txs);
+    setMissions(INITIAL_MISSIONS);
+  };
+
+  const createChild = async (name: string, age: number, avatar: string, pin: string) => {
+    const child = await api.post<ChildData>("/children", { name, age, avatar, pin });
+    setChildren(prev => [...prev, child]);
+  };
+
+  const deleteChild = async (childId: number) => {
+    await api.delete(`/children/${childId}`);
+    setChildren(prev => prev.filter(c => c.id !== childId));
+  };
+
+  const completeMission = async (missionId: string, childId: number) => {
     const mission = missions.find(m => m.id === missionId);
     if (!mission || mission.completed) return;
-    setMissions(prev => prev.map(m => m.id === missionId ? { ...m, completed: true, completedAt: new Date().toISOString() } : m));
-    const newTx: Transaction = {
-      id: `tx_${Date.now()}`,
+    const result = await api.post<{ childBalance: number; id: number; createdAt: string }>("/transactions", {
       childId,
-      date: new Date().toISOString(),
       amount: mission.reward,
       description: `${mission.title} 읽기 완료`,
-      type: "mission"
-    };
-    setTransactions(prev => [newTx, ...prev]);
-    setChildrenState(prev => prev.map(c => c.id === childId ? { ...c, balance: c.balance + mission.reward } : c));
-    setParentBalance(prev => Math.max(0, prev - mission.reward));
+      type: "mission",
+    });
+    setMissions(prev => prev.map(m => m.id === missionId ? { ...m, completed: true, completedAt: new Date().toISOString() } : m));
+    setCurrentChild(prev => prev ? { ...prev, balance: result.childBalance } : prev);
+    setTransactions(prev => [{
+      id: result.id,
+      childId,
+      amount: mission.reward,
+      description: `${mission.title} 읽기 완료`,
+      type: "mission",
+      createdAt: result.createdAt ?? new Date().toISOString(),
+    }, ...prev]);
   };
 
-  const rewardChild = (childId: string, amount: number, description: string): boolean => {
-    if (parentBalance < amount) return false;
-    const newTx: Transaction = {
-      id: `tx_${Date.now()}`,
+  const chargeAllowance = async (childId: number, amount: number) => {
+    const result = await api.post<{ childBalance: number; id: number; createdAt: string }>("/transactions", {
       childId,
-      date: new Date().toISOString(),
-      amount,
-      description,
-      type: "mission"
-    };
-    setTransactions(prev => [newTx, ...prev]);
-    setChildrenState(prev => prev.map(c => c.id === childId ? { ...c, balance: c.balance + amount } : c));
-    setParentBalance(prev => prev - amount);
-    return true;
-  };
-
-  const chargeAllowance = (childId: string, amount: number) => {
-    const newTx: Transaction = {
-      id: `tx_${Date.now()}`,
-      childId,
-      date: new Date().toISOString(),
       amount,
       description: "용돈 채우기",
-      type: "charge"
-    };
-    setTransactions(prev => [newTx, ...prev]);
-    setChildrenState(prev => prev.map(c => c.id === childId ? { ...c, balance: c.balance + amount } : c));
-    setParentBalance(prev => prev + amount);
+      type: "charge",
+    });
+    setChildren(prev => prev.map(c => c.id === childId ? { ...c, balance: result.childBalance } : c));
+    if (parent) {
+      setParent(prev => prev ? { ...prev, balance: prev.balance - amount } : prev);
+    }
   };
 
-  const spendAllowance = (childId: string, amount: number, purpose: string): boolean => {
-    const child = childrenState.find(c => c.id === childId);
-    if (!child || child.balance < amount) return false;
-    const newTx: Transaction = {
-      id: `tx_${Date.now()}`,
-      childId,
-      date: new Date().toISOString(),
-      amount: -amount,
-      description: purpose,
-      type: "spend"
-    };
-    setTransactions(prev => [newTx, ...prev]);
-    setChildrenState(prev => prev.map(c => c.id === childId ? { ...c, balance: c.balance - amount } : c));
-    return true;
+  const spendAllowance = async (childId: number, amount: number, purpose: string): Promise<boolean> => {
+    try {
+      const result = await api.post<{ childBalance: number; id: number; createdAt: string }>("/transactions", {
+        childId,
+        amount: -amount,
+        description: purpose,
+        type: "spend",
+      });
+      setCurrentChild(prev => prev ? { ...prev, balance: result.childBalance } : prev);
+      setTransactions(prev => [{
+        id: result.id,
+        childId,
+        amount: -amount,
+        description: purpose,
+        type: "spend",
+        createdAt: result.createdAt ?? new Date().toISOString(),
+      }, ...prev]);
+      return true;
+    } catch {
+      return false;
+    }
   };
 
   return (
     <AppContext.Provider value={{
-      role, setRole,
-      parent,
-      children: childrenState,
-      selectedChildId, setSelectedChildId,
-      transactions,
-      missions,
-      completeMission,
-      chargeAllowance,
-      rewardChild,
-      spendAllowance,
+      role, loading, parent, currentChild, children, transactions, missions,
+      login, signup, logout, childLogin,
+      createChild, deleteChild, refreshChildren,
+      completeMission, chargeAllowance, spendAllowance,
     }}>
-      {children}
+      {reactChildren}
     </AppContext.Provider>
   );
 }
 
 export function useAppContext() {
   const context = useContext(AppContext);
-  if (context === undefined) {
-    throw new Error("useAppContext must be used within an AppProvider");
-  }
+  if (context === undefined) throw new Error("useAppContext must be used within an AppProvider");
   return context;
 }

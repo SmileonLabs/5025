@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { useAppContext } from "@/context/AppContext";
 import { BottomNav } from "@/components/BottomNav";
@@ -9,15 +9,14 @@ type FilterTab = "전체" | "미완료" | "완료";
 
 export default function MissionsPage() {
   const [_, setLocation] = useLocation();
-  const { selectedChildId, children, missions } = useAppContext();
+  const { currentChild, missions } = useAppContext();
   const [filter, setFilter] = useState<FilterTab>("전체");
 
-  const child = children.find(c => c.id === selectedChildId);
+  useEffect(() => {
+    if (!currentChild) setLocation("/login");
+  }, [currentChild, setLocation]);
 
-  if (!child) {
-    setLocation("/login");
-    return null;
-  }
+  if (!currentChild) return null;
 
   const filteredMissions = missions.filter(m => {
     if (filter === "완료") return m.completed;
@@ -29,8 +28,7 @@ export default function MissionsPage() {
     <div className="min-h-[100dvh] bg-gray-50 pb-24">
       <div className="bg-white px-6 pt-12 pb-4 sticky top-0 z-40 shadow-[0_4px_24px_rgba(0,0,0,0.02)]">
         <h1 className="text-xl font-bold text-gray-900 text-center mb-6">미션 목록</h1>
-        
-        {/* Tabs */}
+
         <div className="flex bg-gray-100 p-1 rounded-full relative">
           {(["전체", "미완료", "완료"] as FilterTab[]).map(tab => (
             <button
@@ -52,10 +50,10 @@ export default function MissionsPage() {
         <div className="space-y-4">
           {filteredMissions.length > 0 ? (
             filteredMissions.map(mission => (
-              <MissionCard 
-                key={mission.id} 
-                mission={mission} 
-                childId={child.id} 
+              <MissionCard
+                key={mission.id}
+                mission={mission}
+                childId={currentChild.id}
                 showActionButton={!mission.completed}
               />
             ))

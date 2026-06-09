@@ -6,6 +6,8 @@ import NotFound from "@/pages/not-found";
 import { AppProvider } from "@/context/AppContext";
 
 import LoginPage from "@/pages/LoginPage";
+import ParentAuthPage from "@/pages/ParentAuthPage";
+import ChildSelectPage from "@/pages/ChildSelectPage";
 import DashboardPage from "@/pages/parent/DashboardPage";
 import ChargePage from "@/pages/parent/ChargePage";
 import HomePage from "@/pages/child/HomePage";
@@ -21,6 +23,9 @@ function Router() {
     <Switch>
       <Route path="/" component={LoginPage} />
       <Route path="/login" component={LoginPage} />
+
+      <Route path="/parent/auth" component={ParentAuthPage} />
+      <Route path="/child/select" component={ChildSelectPage} />
 
       <Route path="/parent/dashboard" component={DashboardPage} />
       <Route path="/parent/charge" component={ChargePage} />

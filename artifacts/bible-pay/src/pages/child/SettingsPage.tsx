@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { useLocation } from "wouter";
 import { Bell, HelpCircle, Info, LogOut, ChevronRight } from "lucide-react";
 import { useAppContext } from "@/context/AppContext";
@@ -5,19 +6,17 @@ import { BottomNav } from "@/components/BottomNav";
 
 export default function SettingsPage() {
   const [_, setLocation] = useLocation();
-  const { selectedChildId, children, setRole, setSelectedChildId } = useAppContext();
+  const { currentChild, logout } = useAppContext();
 
-  const child = children.find(c => c.id === selectedChildId);
+  useEffect(() => {
+    if (!currentChild) setLocation("/login");
+  }, [currentChild, setLocation]);
 
-  if (!child) {
-    setLocation("/login");
-    return null;
-  }
+  if (!currentChild) return null;
 
-  const handleLogout = () => {
-    setRole(null);
-    setSelectedChildId(null);
-    setLocation("/login");
+  const handleLogout = async () => {
+    await logout();
+    setLocation("/");
   };
 
   const menuItems = [
@@ -33,23 +32,21 @@ export default function SettingsPage() {
       </div>
 
       <div className="px-6 pt-6 space-y-6">
-        {/* Profile Card */}
         <div className="bg-white rounded-[24px] p-6 shadow-sm border border-gray-100 flex items-center gap-4">
           <div className="w-16 h-16 rounded-full bg-gray-50 flex items-center justify-center text-3xl">
-            {child.avatar}
+            {currentChild.avatar}
           </div>
           <div>
-            <h2 className="text-xl font-bold text-gray-900">{child.name}</h2>
-            <p className="text-gray-500 font-medium">{child.age}세</p>
+            <h2 className="text-xl font-bold text-gray-900">{currentChild.name}</h2>
+            <p className="text-gray-500 font-medium">{currentChild.age}세</p>
           </div>
         </div>
 
-        {/* Menu List */}
         <div className="bg-white rounded-[24px] overflow-hidden shadow-sm border border-gray-100">
           {menuItems.map((item, i) => {
             const Icon = item.icon;
             return (
-              <button 
+              <button
                 key={i}
                 className="w-full flex items-center justify-between p-4 border-b border-gray-50 last:border-0 hover:bg-gray-50 transition-colors"
               >
@@ -65,8 +62,7 @@ export default function SettingsPage() {
           })}
         </div>
 
-        {/* Logout */}
-        <button 
+        <button
           onClick={handleLogout}
           className="w-full bg-white rounded-[24px] p-4 shadow-sm border border-gray-100 flex items-center justify-center gap-2 text-destructive font-bold hover:bg-red-50 transition-colors"
           data-testid="btn-logout"

@@ -5,7 +5,7 @@ import { Mission } from "@/context/AppContext";
 
 interface MissionCardProps {
   mission: Mission;
-  childId?: string;
+  childId?: number;
   showActionButton?: boolean;
 }
 

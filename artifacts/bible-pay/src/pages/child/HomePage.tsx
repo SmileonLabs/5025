@@ -10,29 +10,25 @@ import { motion } from "framer-motion";
 
 export default function HomePage() {
   const [_, setLocation] = useLocation();
-  const { selectedChildId, children, missions, transactions } = useAppContext();
+  const { currentChild, missions, transactions } = useAppContext();
   const [spendOpen, setSpendOpen] = useState(false);
 
-  const child = children.find(c => c.id === selectedChildId);
-
   React.useEffect(() => {
-    if (!child) setLocation("/login");
-  }, [child, setLocation]);
+    if (!currentChild) setLocation("/login");
+  }, [currentChild, setLocation]);
 
-  if (!child) return null;
+  if (!currentChild) return null;
 
   const todaysMission = missions.find(m => !m.completed) || missions[0];
 
-  const childTxs = transactions.filter(t => t.childId === child.id);
-  const totalEarned = childTxs.filter(t => t.amount > 0).reduce((s, t) => s + t.amount, 0);
-  const completedMissionsCount = childTxs.filter(t => t.type === "mission").length;
+  const totalEarned = transactions.filter(t => t.amount > 0).reduce((s, t) => s + t.amount, 0);
+  const completedMissionsCount = transactions.filter(t => t.type === "mission").length;
 
   return (
     <div className="min-h-[100dvh] bg-gray-50 pb-24">
-      {/* Header */}
       <div className="bg-white px-6 pt-12 pb-4 flex justify-between items-center sticky top-0 z-40 shadow-[0_4px_24px_rgba(0,0,0,0.02)]">
         <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-          안녕, {child.name}! <span className="text-2xl">{child.avatar}</span>
+          안녕, {currentChild.name}! <span className="text-2xl">{currentChild.avatar}</span>
         </h1>
         <button className="p-2 text-gray-500 bg-gray-50 rounded-full relative">
           <Bell className="w-6 h-6" />
@@ -41,14 +37,14 @@ export default function HomePage() {
       </div>
 
       <div className="px-6 pt-6 space-y-6">
-        {/* HERO Balance Card */}
+        {/* Hero Balance Card */}
         <div className="w-full bg-gradient-to-br from-primary via-primary/90 to-accent/80 rounded-[24px] p-6 text-white shadow-lg relative overflow-hidden">
           <div className="absolute top-0 right-0 w-32 h-32 bg-white/20 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2" />
           <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/10 rounded-full blur-xl translate-y-1/2 -translate-x-1/2" />
 
           <div className="relative z-10">
             <p className="text-white/70 font-medium mb-1 text-sm">내 잔액</p>
-            <h2 className="text-4xl font-black mb-5">₩{child.balance.toLocaleString("ko-KR")}</h2>
+            <h2 className="text-4xl font-black mb-5">₩{currentChild.balance.toLocaleString("ko-KR")}</h2>
 
             <div className="flex gap-2">
               <button
@@ -89,19 +85,21 @@ export default function HomePage() {
         </div>
 
         {/* Today's Mission */}
-        <section>
-          <div className="flex justify-between items-center mb-3">
-            <h2 className="text-lg font-bold text-gray-900">오늘의 성경 읽기</h2>
-            <button
-              onClick={() => setLocation("/child/missions")}
-              className="text-primary-foreground text-sm font-bold"
-              data-testid="btn-all-missions"
-            >
-              전체보기
-            </button>
-          </div>
-          <MissionCard mission={todaysMission} childId={child.id} />
-        </section>
+        {todaysMission && (
+          <section>
+            <div className="flex justify-between items-center mb-3">
+              <h2 className="text-lg font-bold text-gray-900">오늘의 성경 읽기</h2>
+              <button
+                onClick={() => setLocation("/child/missions")}
+                className="text-primary-foreground text-sm font-bold"
+                data-testid="btn-all-missions"
+              >
+                전체보기
+              </button>
+            </div>
+            <MissionCard mission={todaysMission} childId={currentChild.id} />
+          </section>
+        )}
 
         <BibleIllustration />
       </div>
@@ -111,8 +109,8 @@ export default function HomePage() {
       <SpendModal
         open={spendOpen}
         onClose={() => setSpendOpen(false)}
-        childId={child.id}
-        balance={child.balance}
+        childId={currentChild.id}
+        balance={currentChild.balance}
       />
     </div>
   );
