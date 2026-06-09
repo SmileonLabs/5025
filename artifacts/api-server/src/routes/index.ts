@@ -6,6 +6,7 @@ import childrenRouter from "./children";
 import transactionsRouter from "./transactions";
 import missionsRouter from "./missions";
 import requestsRouter from "./requests";
+import pushRouter from "./push";
 
 const router: IRouter = Router();
 
@@ -16,5 +17,6 @@ router.use(childrenRouter);
 router.use(transactionsRouter);
 router.use(missionsRouter);
 router.use(requestsRouter);
+router.use(pushRouter);
 
 export default router;

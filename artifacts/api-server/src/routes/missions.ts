@@ -2,6 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { db, missionsTable, missionLogsTable, childrenTable, transactionsTable } from "@workspace/db";
 import { eq, and, desc, inArray } from "drizzle-orm";
+import { sendPushToParent } from "../lib/push";
 
 const router = Router();
 
@@ -98,10 +99,14 @@ router.post("/missions/:id/submit", requireChild, async (req, res) => {
   const [child] = await db.select().from(childrenTable).where(eq(childrenTable.id, childId)).limit(1);
   if (!child || child.parentId !== mission.parentId) { res.status(403).json({ error: "권한이 없어요." }); return; }
 
-  // Confirm type → pending
+  // Confirm type → pending parent approval
   if (mission.type === "confirm") {
     const [log] = await db.insert(missionLogsTable)
       .values({ missionId, childId, status: "requested" }).returning();
+    void sendPushToParent(child.parentId, {
+      title: "📋 미션 승인 요청",
+      body: `${child.name}님이 '${mission.title}' 미션을 완료했어요. 승인하면 ${mission.reward.toLocaleString()}원이 지급돼요.`,
+    });
     res.status(201).json({ log, pending: true });
     return;
   }
@@ -150,6 +155,11 @@ router.post("/missions/:id/submit", requireChild, async (req, res) => {
 
   const [log] = await db.insert(missionLogsTable)
     .values({ missionId, childId, status: "completed", bibleBook, bibleChapter, reflection, transactionId: tx.id }).returning();
+
+  void sendPushToParent(child.parentId, {
+    title: "🎉 미션 완료!",
+    body: `${child.name}님이 '${mission.title}' 미션을 완료하고 ${mission.reward.toLocaleString()}원을 받았어요.`,
+  });
 
   res.status(201).json({ log, tx, childBalance: newBalance });
 });

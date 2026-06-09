@@ -1,3 +1,4 @@
 - [bible-pay parent vs child state](bible-pay-state-scoping.md) — parent dashboard must read parentTransactions (not child-scoped transactions); /transactions/all powers it.
 - [bible-pay DB push](bible-pay-db-push.md) — drizzle-kit push hangs on non-TTY; apply additive schema via executeSql instead.
 - [bible-pay lib typecheck](bible-pay-lib-typecheck.md) — integrations-openai libs have pre-existing missing-deps errors that block typecheck:libs and api-server typecheck; runtime is fine via esbuild.
+- [bible-pay web push](bible-pay-web-push.md) — VAPID+SW push; devOptions must stay enabled for dev SW, custom SW needs separate webworker tsconfig, transient register error after dep changes.

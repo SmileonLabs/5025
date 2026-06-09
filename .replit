@@ -33,3 +33,10 @@ externalPort = 3000
 
 [nix]
 channel = "stable-25_05"
+
+[userenv]
+
+[userenv.shared]
+VAPID_PUBLIC_KEY = "BKrczpG_Cffi6PfMrHwH31VCqqgZIMH6TdrMh5v9dWBwQrcUnxiaI6xV6txhn19VxJgRqwtNRaxkjjw4HHuJqLo"
+VAPID_PRIVATE_KEY = "G9aGmabqbtdX2NC89p78c3w5J8GWAq1l92mF5bkRbx8"
+VAPID_SUBJECT = "mailto:noreply@bible-pay.app"

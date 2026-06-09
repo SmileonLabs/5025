@@ -7,6 +7,7 @@ import { BibleIllustration } from "@/components/BibleIllustration";
 import { TransactionItem } from "@/components/TransactionItem";
 import { ChildCreateModal } from "@/components/ChildCreateModal";
 import { ParentTopupModal } from "@/components/ParentTopupModal";
+import { PushNotificationCard } from "@/components/PushNotificationCard";
 
 const REQUEST_TYPE_META: Record<string, { emoji: string; label: string }> = {
   allowance: { emoji: "💸", label: "용돈 요청" },
@@ -117,6 +118,8 @@ export default function DashboardPage() {
       </div>
 
       <div className="px-6 space-y-8">
+        <PushNotificationCard />
+
         {pendingRequests.length > 0 && (
           <section>
             <div className="flex items-center gap-2 mb-4">

@@ -2,6 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { db, transactionsTable, childrenTable, parentsTable } from "@workspace/db";
 import { eq, desc, inArray } from "drizzle-orm";
+import { sendPushToParent } from "../lib/push";
 
 const router = Router();
 
@@ -92,6 +93,13 @@ router.post("/transactions", async (req, res) => {
     .insert(transactionsTable)
     .values({ childId, amount, description, type, category: category ?? null })
     .returning();
+
+  if (type === "spend") {
+    void sendPushToParent(child.parentId, {
+      title: "💸 용돈 사용",
+      body: `${child.name}님이 ${Math.abs(amount).toLocaleString()}원을 사용했어요. (${description})`,
+    });
+  }
 
   res.status(201).json({ ...tx, childBalance: newBalance });
 });
