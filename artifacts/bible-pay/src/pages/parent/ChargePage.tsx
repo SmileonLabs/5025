@@ -1,0 +1,126 @@
+import { useState } from "react";
+import { useLocation } from "wouter";
+import { ChevronLeft } from "lucide-react";
+import { useAppContext } from "@/context/AppContext";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { useToast } from "@/hooks/use-toast";
+
+const PRESET_AMOUNTS = [500, 1000, 2000, 5000];
+
+export default function ChargePage() {
+  const [_, setLocation] = useLocation();
+  const { children, chargeAllowance } = useAppContext();
+  const { toast } = useToast();
+  
+  const [selectedChildId, setSelectedChildId] = useState<string>(children[0]?.id || "");
+  const [amount, setAmount] = useState<string>("");
+
+  const handleCharge = () => {
+    const numAmount = parseInt(amount.replace(/,/g, ''), 10);
+    if (isNaN(numAmount) || numAmount <= 0) {
+      toast({ title: "금액을 입력해주세요.", variant: "destructive" });
+      return;
+    }
+    
+    chargeAllowance(selectedChildId, numAmount);
+    toast({ 
+      title: "충전 완료! 💸", 
+      description: `${children.find(c => c.id === selectedChildId)?.name}에게 ${numAmount.toLocaleString('ko-KR')}원을 보냈습니다.` 
+    });
+    
+    setTimeout(() => {
+      setLocation("/parent/dashboard");
+    }, 1500);
+  };
+
+  const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value.replace(/[^0-9]/g, '');
+    setAmount(val ? parseInt(val, 10).toLocaleString('ko-KR') : '');
+  };
+
+  const handlePresetClick = (preset: number) => {
+    setAmount(preset.toLocaleString('ko-KR'));
+  };
+
+  return (
+    <div className="min-h-[100dvh] bg-white flex flex-col">
+      {/* Header */}
+      <div className="px-4 py-4 flex items-center relative border-b border-gray-50">
+        <button 
+          onClick={() => setLocation("/parent/dashboard")}
+          className="p-2 absolute left-4 text-gray-600 hover:bg-gray-100 rounded-full"
+        >
+          <ChevronLeft className="w-6 h-6" />
+        </button>
+        <h1 className="w-full text-center text-lg font-bold text-gray-900">용돈 충전하기</h1>
+      </div>
+
+      <div className="flex-1 px-6 pt-8 flex flex-col">
+        {/* Child Selector */}
+        <div className="mb-8">
+          <h2 className="text-sm font-bold text-gray-500 mb-3">누구에게 보낼까요?</h2>
+          <div className="flex gap-3">
+            {children.map(child => (
+              <button
+                key={child.id}
+                onClick={() => setSelectedChildId(child.id)}
+                className={`flex-1 py-4 px-3 rounded-[20px] border-2 transition-all flex flex-col items-center gap-2 ${
+                  selectedChildId === child.id 
+                    ? 'border-primary bg-primary/5 shadow-sm' 
+                    : 'border-gray-100 bg-white'
+                }`}
+                data-testid={`select-child-${child.id}`}
+              >
+                <div className="text-3xl">{child.avatar}</div>
+                <span className={`font-bold ${selectedChildId === child.id ? 'text-primary-foreground' : 'text-gray-600'}`}>
+                  {child.name}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Amount Input */}
+        <div className="mb-8">
+          <h2 className="text-sm font-bold text-gray-500 mb-3">얼마를 보낼까요?</h2>
+          <div className="relative mb-4">
+            <Input 
+              type="text" 
+              value={amount}
+              onChange={handleAmountChange}
+              placeholder="0"
+              className="text-right text-3xl font-bold h-[72px] rounded-[20px] pr-12 focus-visible:ring-primary border-gray-200"
+              data-testid="input-amount"
+            />
+            <span className="absolute right-5 top-1/2 -translate-y-1/2 text-xl font-bold text-gray-400">원</span>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            {PRESET_AMOUNTS.map(preset => (
+              <button
+                key={preset}
+                onClick={() => handlePresetClick(preset)}
+                className="px-4 py-2 bg-gray-50 hover:bg-gray-100 rounded-full text-sm font-bold text-gray-700 transition-colors"
+                data-testid={`preset-${preset}`}
+              >
+                +{preset.toLocaleString('ko-KR')}원
+              </button>
+            ))}
+          </div>
+        </div>
+        
+        <div className="mt-auto pb-12 pt-4">
+          <Button 
+            onClick={handleCharge}
+            disabled={!amount || parseInt(amount.replace(/,/g, ''), 10) === 0}
+            className="w-full h-[60px] rounded-[20px] text-lg font-bold bg-primary hover:bg-primary/90 text-primary-foreground shadow-md"
+            data-testid="btn-submit-charge"
+          >
+            충전하기
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
