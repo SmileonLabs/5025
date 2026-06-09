@@ -133,8 +133,13 @@ export default function DashboardPage() {
           ) : (
             <div className="space-y-4">
               {children.map(child => {
-                const targetGoal = 20000;
-                const progress = Math.min(100, (child.balance / targetGoal) * 100);
+                const activeMissionTotal = missions
+                  .filter(m => m.isActive)
+                  .reduce((sum, m) => sum + m.reward, 0);
+                const hasMissions = activeMissionTotal > 0;
+                const progress = hasMissions
+                  ? Math.min(100, (child.balance / activeMissionTotal) * 100)
+                  : 0;
                 return (
                   <div key={child.id} className="bg-white rounded-[24px] p-5 shadow-sm border border-gray-100 flex flex-col gap-4">
                     <div className="flex items-center justify-between">
@@ -147,15 +152,21 @@ export default function DashboardPage() {
                       </div>
                       <div className="font-bold text-xl">{child.balance.toLocaleString("ko-KR")}원</div>
                     </div>
-                    <div>
-                      <div className="flex justify-between text-xs text-gray-500 mb-1.5 font-medium">
-                        <span>이번 달 목표</span>
-                        <span>{progress.toFixed(0)}%</span>
+                    {hasMissions ? (
+                      <div>
+                        <div className="flex justify-between text-xs text-gray-500 mb-1.5 font-medium">
+                          <span>미션 전부 달성 시 최대 보상</span>
+                          <span>{child.balance.toLocaleString("ko-KR")} / {activeMissionTotal.toLocaleString("ko-KR")}원</span>
+                        </div>
+                        <div className="h-3 w-full bg-gray-100 rounded-full overflow-hidden">
+                          <div className="h-full bg-secondary/80 rounded-full transition-all" style={{ width: `${progress}%` }} />
+                        </div>
                       </div>
-                      <div className="h-3 w-full bg-gray-100 rounded-full overflow-hidden">
-                        <div className="h-full bg-secondary/80 rounded-full" style={{ width: `${progress}%` }} />
-                      </div>
-                    </div>
+                    ) : (
+                      <p className="text-xs text-gray-400 bg-gray-50 rounded-xl px-3 py-2 text-center">
+                        미션을 만들면 아이가 용돈을 벌 수 있어요 📋
+                      </p>
+                    )}
                   </div>
                 );
               })}
