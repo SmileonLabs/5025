@@ -9,6 +9,7 @@ export const missionLogsTable = pgTable("mission_logs", {
   status: text("status").notNull().$type<"completed" | "requested" | "approved" | "rejected">(),
   bibleBook: text("bible_book"),
   bibleChapter: integer("bible_chapter"),
+  reflection: text("reflection"),
   transactionId: integer("transaction_id"),
   requestedAt: timestamp("requested_at", { withTimezone: true }).notNull().defaultNow(),
   approvedAt: timestamp("approved_at", { withTimezone: true }),

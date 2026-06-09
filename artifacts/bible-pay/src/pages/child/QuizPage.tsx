@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useLocation, useParams, useSearch } from "wouter";
-import { ChevronLeft, Star, Loader2, CheckCircle2, XCircle, Sparkles } from "lucide-react";
+import { ChevronLeft, Star, Loader2, CheckCircle2, XCircle, Sparkles, PenLine } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAppContext } from "@/context/AppContext";
 import { Button } from "@/components/ui/button";
@@ -12,7 +12,9 @@ interface QuizQuestion {
   correctIndex: number;
 }
 
-type FlowStep = "loading" | "quiz" | "result";
+type FlowStep = "loading" | "quiz" | "reflection" | "result";
+
+const MIN_REFLECTION = 5;
 
 function ConfettiPiece({ index }: { index: number }) {
   const colors = ["#FFE066", "#A8EDCB", "#C8B8F8", "#FFD6B0", "#FF8FAB", "#7DD3FC"];
@@ -54,6 +56,8 @@ export default function QuizPage() {
   const [showConfetti, setShowConfetti] = useState(false);
   const [rewardGranted, setRewardGranted] = useState(false);
   const [finalBalance, setFinalBalance] = useState<number | null>(null);
+  const [reflection, setReflection] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
   if (!currentChild) { setLocation("/login"); return null; }
   if (!mission) { setLocation("/child/missions"); return null; }
@@ -69,6 +73,7 @@ export default function QuizPage() {
     setShowFeedback(false);
     setRewardGranted(false);
     setFinalBalance(null);
+    setReflection("");
 
     try {
       const res = await fetch("/api/quiz/generate", {
@@ -101,7 +106,7 @@ export default function QuizPage() {
     const isCorrect = idx === questions[currentQ].correctIndex;
     const newAnswers = [...answeredCorrectly, isCorrect];
 
-    setTimeout(async () => {
+    setTimeout(() => {
       if (currentQ + 1 < questions.length) {
         setCurrentQ(prev => prev + 1);
         setSelectedAnswer(null);
@@ -109,27 +114,36 @@ export default function QuizPage() {
         setAnsweredCorrectly(newAnswers);
       } else {
         setAnsweredCorrectly(newAnswers);
-        setStep("result");
-        const allCorrect = newAnswers.every(Boolean);
-        if (allCorrect && !rewardGranted) {
-          setRewardGranted(true);
-          setShowConfetti(true);
-          try {
-            const result = await submitMission(missionId, {
-              bibleBook: bibleBook || undefined,
-              bibleChapter: bibleChapter || undefined,
-            });
-            setFinalBalance(result.childBalance);
-          } catch (err: any) {
-            if (err?.status === 409) {
-              toast({ title: "이미 완료한 장이에요!", description: "다른 장에 도전해보세요." });
-            } else {
-              toast({ title: "보상 지급에 실패했어요.", variant: "destructive" });
-            }
-          }
-        }
+        const passed = newAnswers.every(Boolean);
+        // Passed → go to reflection step (reward only after writing). Failed → result.
+        setStep(passed ? "reflection" : "result");
       }
     }, 1200);
+  };
+
+  const handleSubmitReflection = async () => {
+    if (reflection.trim().length < MIN_REFLECTION || rewardGranted || submitting) return;
+    setSubmitting(true);
+    try {
+      const result = await submitMission(missionId, {
+        bibleBook: bibleBook || undefined,
+        bibleChapter: bibleChapter || undefined,
+        reflection: reflection.trim(),
+      });
+      setRewardGranted(true);
+      setFinalBalance(result.childBalance);
+      setShowConfetti(true);
+      setStep("result");
+    } catch (err: any) {
+      if (err?.status === 409) {
+        toast({ title: "이미 완료한 장이에요!", description: "다른 장에 도전해보세요." });
+        setStep("result");
+      } else {
+        toast({ title: err?.message ?? "보상 지급에 실패했어요.", variant: "destructive" });
+      }
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const allCorrect = answeredCorrectly.length > 0 && answeredCorrectly.every(Boolean);
@@ -210,6 +224,61 @@ export default function QuizPage() {
                     </motion.button>
                   );
                 })}
+              </div>
+            </motion.div>
+          )}
+
+          {step === "reflection" && (
+            <motion.div key="reflection" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="flex flex-col gap-5 flex-1">
+              <div className="flex flex-col items-center text-center gap-3 pt-2">
+                <motion.div
+                  initial={{ scale: 0 }}
+                  animate={{ scale: [0, 1.2, 1] }}
+                  transition={{ duration: 0.5, ease: "backOut" }}
+                  className="w-20 h-20 rounded-full bg-gradient-to-br from-green-300 to-emerald-400 flex items-center justify-center shadow-md"
+                >
+                  <CheckCircle2 className="w-10 h-10 text-white" />
+                </motion.div>
+                <div>
+                  <h2 className="text-xl font-black text-gray-900">퀴즈 정답! 🎉</h2>
+                  <p className="text-sm text-gray-500 mt-1">마지막으로 깨달은 점이나<br />궁금한 점을 적으면 용돈이 지급돼요.</p>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-[20px] p-4 shadow-sm border border-gray-100">
+                <div className="flex items-center gap-2 mb-2">
+                  <PenLine className="w-4 h-4 text-primary-foreground" />
+                  <span className="font-bold text-gray-800 text-sm">{passage}을(를) 읽고...</span>
+                </div>
+                <textarea
+                  value={reflection}
+                  onChange={(e) => setReflection(e.target.value)}
+                  placeholder="예) 하나님이 정말 우리를 사랑하신다는 걸 느꼈어요. 그런데 왜 노아만 방주를 만들었을까요?"
+                  rows={5}
+                  maxLength={500}
+                  className="w-full resize-none rounded-[14px] border-2 border-gray-100 focus:border-primary/40 focus:outline-none p-3 text-sm text-gray-800 placeholder:text-gray-300 leading-relaxed"
+                  data-testid="input-reflection"
+                />
+                <div className="flex justify-between items-center mt-1.5 text-xs">
+                  <span className={reflection.trim().length < MIN_REFLECTION ? "text-gray-400" : "text-green-600 font-bold"}>
+                    {reflection.trim().length < MIN_REFLECTION
+                      ? `${MIN_REFLECTION}자 이상 적어주세요`
+                      : "좋아요! 이제 용돈을 받을 수 있어요 ✨"}
+                  </span>
+                  <span className="text-gray-300">{reflection.length}/500</span>
+                </div>
+              </div>
+
+              <div className="mt-auto">
+                <Button
+                  onClick={handleSubmitReflection}
+                  disabled={reflection.trim().length < MIN_REFLECTION || submitting}
+                  className="w-full h-[52px] rounded-[14px] font-bold bg-primary hover:bg-primary/90 text-white flex items-center justify-center gap-2 disabled:opacity-40"
+                  data-testid="btn-submit-reflection"
+                >
+                  {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
+                  {submitting ? "지급 중..." : `작성 완료하고 +${reward.toLocaleString("ko-KR")}원 받기 💰`}
+                </Button>
               </div>
             </motion.div>
           )}

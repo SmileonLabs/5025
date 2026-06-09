@@ -77,7 +77,7 @@ interface AppState {
   deleteMission: (id: number) => Promise<void>;
   refreshMissions: () => Promise<void>;
   // Mission actions (child)
-  submitMission: (missionId: number, opts?: { bibleBook?: string; bibleChapter?: number }) => Promise<{ childBalance: number }>;
+  submitMission: (missionId: number, opts?: { bibleBook?: string; bibleChapter?: number; reflection?: string }) => Promise<{ childBalance: number }>;
   // Pending approvals (parent)
   refreshPendingLogs: () => Promise<void>;
   approveMissionLog: (logId: number) => Promise<void>;
@@ -229,10 +229,10 @@ export function AppProvider({ children: reactChildren }: { children: ReactNode }
     setMissions(prev => prev.filter(m => m.id !== id));
   };
 
-  const submitMission = async (missionId: number, opts?: { bibleBook?: string; bibleChapter?: number }): Promise<{ childBalance: number }> => {
+  const submitMission = async (missionId: number, opts?: { bibleBook?: string; bibleChapter?: number; reflection?: string }): Promise<{ childBalance: number }> => {
     const result = await api.post<{ childBalance: number; log: unknown; tx?: unknown; pending?: boolean }>(
       `/missions/${missionId}/submit`,
-      { bibleBook: opts?.bibleBook, bibleChapter: opts?.bibleChapter }
+      { bibleBook: opts?.bibleBook, bibleChapter: opts?.bibleChapter, reflection: opts?.reflection }
     );
     if (!result.pending && result.childBalance !== undefined) {
       setCurrentChild(prev => prev ? { ...prev, balance: result.childBalance } : prev);

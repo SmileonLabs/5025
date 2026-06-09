@@ -110,11 +110,22 @@ router.post("/missions/:id/submit", requireChild, async (req, res) => {
   const bodyParsed = z.object({
     bibleBook: z.string().optional(),
     bibleChapter: z.number().int().optional(),
+    reflection: z.string().optional(),
   }).safeParse(req.body);
-  const { bibleBook, bibleChapter } = bodyParsed.success ? bodyParsed.data : {};
+  const { bibleBook, bibleChapter, reflection } = bodyParsed.success ? bodyParsed.data : {};
 
-  // Prevent duplicate bible chapter completion
-  if (mission.type === "bible" && bibleBook && bibleChapter) {
+  if (mission.type === "bible") {
+    // Bible missions require chapter context (proof of which chapter was read)
+    if (!bibleBook || !bibleChapter) {
+      res.status(400).json({ error: "성경 책과 장 정보가 필요해요." });
+      return;
+    }
+    // ...and a reflection note before reward is granted
+    if (!reflection || reflection.trim().length < 5) {
+      res.status(400).json({ error: "묵상 내용을 5자 이상 적어주세요." });
+      return;
+    }
+    // Prevent duplicate bible chapter completion
     const dup = await db.select().from(missionLogsTable).where(
       and(
         eq(missionLogsTable.missionId, missionId),
@@ -138,7 +149,7 @@ router.post("/missions/:id/submit", requireChild, async (req, res) => {
     .values({ childId, amount: mission.reward, description, type: "mission" }).returning();
 
   const [log] = await db.insert(missionLogsTable)
-    .values({ missionId, childId, status: "completed", bibleBook, bibleChapter, transactionId: tx.id }).returning();
+    .values({ missionId, childId, status: "completed", bibleBook, bibleChapter, reflection, transactionId: tx.id }).returning();
 
   res.status(201).json({ log, tx, childBalance: newBalance });
 });
