@@ -12,27 +12,25 @@ import HomePage from "@/pages/child/HomePage";
 import MissionsPage from "@/pages/child/MissionsPage";
 import LedgerPage from "@/pages/child/LedgerPage";
 import SettingsPage from "@/pages/child/SettingsPage";
+import QuizPage from "@/pages/child/QuizPage";
 
 const queryClient = new QueryClient();
-
-function RedirectToLogin() {
-  return <LoginPage />;
-}
 
 function Router() {
   return (
     <Switch>
-      <Route path="/" component={RedirectToLogin} />
+      <Route path="/" component={LoginPage} />
       <Route path="/login" component={LoginPage} />
-      
+
       <Route path="/parent/dashboard" component={DashboardPage} />
       <Route path="/parent/charge" component={ChargePage} />
-      
+
       <Route path="/child/home" component={HomePage} />
       <Route path="/child/missions" component={MissionsPage} />
       <Route path="/child/ledger" component={LedgerPage} />
       <Route path="/child/settings" component={SettingsPage} />
-      
+      <Route path="/child/quiz/:missionId" component={QuizPage} />
+
       <Route component={NotFound} />
     </Switch>
   );

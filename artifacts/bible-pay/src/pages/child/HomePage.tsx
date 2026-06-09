@@ -1,3 +1,4 @@
+import React from "react";
 import { useLocation } from "wouter";
 import { Bell, Award, Wallet } from "lucide-react";
 import { useAppContext } from "@/context/AppContext";
@@ -11,10 +12,11 @@ export default function HomePage() {
   
   const child = children.find(c => c.id === selectedChildId);
 
-  if (!child) {
-    setLocation("/login");
-    return null;
-  }
+  React.useEffect(() => {
+    if (!child) setLocation("/login");
+  }, [child, setLocation]);
+
+  if (!child) return null;
 
   // Find today's mission - just pick the first uncompleted one for mock
   const todaysMission = missions.find(m => !m.completed) || missions[0];

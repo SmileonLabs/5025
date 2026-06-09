@@ -5,6 +5,7 @@ export type Role = "parent" | "child" | null;
 export interface Parent {
   name: string;
   email: string;
+  balance: number;
 }
 
 export interface Child {
@@ -32,7 +33,7 @@ export interface Mission {
   completed: boolean;
   dueDate: string;
   completedAt?: string;
-  childId?: string; // If specific to a child, otherwise applies to all mock children
+  childId?: string;
 }
 
 interface AppState {
@@ -46,6 +47,7 @@ interface AppState {
   missions: Mission[];
   completeMission: (missionId: string, childId: string) => void;
   chargeAllowance: (childId: string, amount: number) => void;
+  rewardChild: (childId: string, amount: number, description: string) => boolean;
 }
 
 const initialMissions: Mission[] = [
@@ -61,7 +63,7 @@ const initialChildren: Child[] = [
 
 const initialTransactions: Transaction[] = [
   { id: "t1", childId: "c1", date: new Date().toISOString(), amount: 500, description: "잠언 1장 읽기 완료", type: "mission" },
-  { id: "t2", childId: "c1", date: new Date(Date.now() - 86400000).toISOString(), amount: 5000, description: "용돈 충전", type: "charge" },
+  { id: "t2", childId: "c1", date: new Date(Date.now() - 86400000).toISOString(), amount: 5000, description: "용돈 채우기", type: "charge" },
   { id: "t3", childId: "c2", date: new Date().toISOString(), amount: 300, description: "시편 23편 읽기 완료", type: "mission" },
 ];
 
@@ -70,21 +72,19 @@ const AppContext = createContext<AppState | undefined>(undefined);
 export function AppProvider({ children }: { children: ReactNode }) {
   const [role, setRole] = useState<Role>(null);
   const [selectedChildId, setSelectedChildId] = useState<string | null>(null);
-  
+  const [parentBalance, setParentBalance] = useState<number>(50000);
   const [childrenState, setChildrenState] = useState<Child[]>(initialChildren);
   const [transactions, setTransactions] = useState<Transaction[]>(initialTransactions);
   const [missions, setMissions] = useState<Mission[]>(initialMissions);
 
-  const parent: Parent = { name: "김부모", email: "parent@demo.com" };
+  const parent: Parent = { name: "김부모", email: "parent@demo.com", balance: parentBalance };
 
   const completeMission = (missionId: string, childId: string) => {
     const mission = missions.find(m => m.id === missionId);
     if (!mission || mission.completed) return;
 
-    // In a real app we'd duplicate the mission for the child, but here we just mark it complete
     setMissions(prev => prev.map(m => m.id === missionId ? { ...m, completed: true, completedAt: new Date().toISOString() } : m));
-    
-    // Add transaction
+
     const newTx: Transaction = {
       id: `tx_${Date.now()}`,
       childId,
@@ -94,25 +94,39 @@ export function AppProvider({ children }: { children: ReactNode }) {
       type: "mission"
     };
     setTransactions(prev => [newTx, ...prev]);
-
-    // Update balance
     setChildrenState(prev => prev.map(c => c.id === childId ? { ...c, balance: c.balance + mission.reward } : c));
+    setParentBalance(prev => Math.max(0, prev - mission.reward));
   };
 
-  const chargeAllowance = (childId: string, amount: number) => {
-    // Add transaction
+  const rewardChild = (childId: string, amount: number, description: string): boolean => {
+    if (parentBalance < amount) return false;
+
     const newTx: Transaction = {
       id: `tx_${Date.now()}`,
       childId,
       date: new Date().toISOString(),
       amount,
-      description: "용돈 충전",
+      description,
+      type: "mission"
+    };
+    setTransactions(prev => [newTx, ...prev]);
+    setChildrenState(prev => prev.map(c => c.id === childId ? { ...c, balance: c.balance + amount } : c));
+    setParentBalance(prev => prev - amount);
+    return true;
+  };
+
+  const chargeAllowance = (childId: string, amount: number) => {
+    const newTx: Transaction = {
+      id: `tx_${Date.now()}`,
+      childId,
+      date: new Date().toISOString(),
+      amount,
+      description: "용돈 채우기",
       type: "charge"
     };
     setTransactions(prev => [newTx, ...prev]);
-
-    // Update balance
     setChildrenState(prev => prev.map(c => c.id === childId ? { ...c, balance: c.balance + amount } : c));
+    setParentBalance(prev => prev + amount);
   };
 
   return (
@@ -124,7 +138,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       transactions,
       missions,
       completeMission,
-      chargeAllowance
+      chargeAllowance,
+      rewardChild,
     }}>
       {children}
     </AppContext.Provider>

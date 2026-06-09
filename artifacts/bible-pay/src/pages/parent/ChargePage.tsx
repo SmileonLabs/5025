@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeft, Wallet } from "lucide-react";
 import { useAppContext } from "@/context/AppContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,53 +10,64 @@ const PRESET_AMOUNTS = [500, 1000, 2000, 5000];
 
 export default function ChargePage() {
   const [_, setLocation] = useLocation();
-  const { children, chargeAllowance } = useAppContext();
+  const { children, chargeAllowance, parent } = useAppContext();
   const { toast } = useToast();
-  
+
   const [selectedChildId, setSelectedChildId] = useState<string>(children[0]?.id || "");
   const [amount, setAmount] = useState<string>("");
 
   const handleCharge = () => {
-    const numAmount = parseInt(amount.replace(/,/g, ''), 10);
+    const numAmount = parseInt(amount.replace(/,/g, ""), 10);
     if (isNaN(numAmount) || numAmount <= 0) {
       toast({ title: "금액을 입력해주세요.", variant: "destructive" });
       return;
     }
-    
+
     chargeAllowance(selectedChildId, numAmount);
-    toast({ 
-      title: "충전 완료! 💸", 
-      description: `${children.find(c => c.id === selectedChildId)?.name}에게 ${numAmount.toLocaleString('ko-KR')}원을 보냈습니다.` 
+    toast({
+      title: "용돈 채우기 완료! 💸",
+      description: `${children.find(c => c.id === selectedChildId)?.name}에게 ${numAmount.toLocaleString("ko-KR")}원을 보냈어요!`,
     });
-    
+
     setTimeout(() => {
       setLocation("/parent/dashboard");
     }, 1500);
   };
 
   const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = e.target.value.replace(/[^0-9]/g, '');
-    setAmount(val ? parseInt(val, 10).toLocaleString('ko-KR') : '');
+    const val = e.target.value.replace(/[^0-9]/g, "");
+    setAmount(val ? parseInt(val, 10).toLocaleString("ko-KR") : "");
   };
 
   const handlePresetClick = (preset: number) => {
-    setAmount(preset.toLocaleString('ko-KR'));
+    setAmount(preset.toLocaleString("ko-KR"));
   };
 
   return (
     <div className="min-h-[100dvh] bg-white flex flex-col">
-      {/* Header */}
       <div className="px-4 py-4 flex items-center relative border-b border-gray-50">
-        <button 
+        <button
           onClick={() => setLocation("/parent/dashboard")}
           className="p-2 absolute left-4 text-gray-600 hover:bg-gray-100 rounded-full"
+          data-testid="btn-back"
         >
           <ChevronLeft className="w-6 h-6" />
         </button>
-        <h1 className="w-full text-center text-lg font-bold text-gray-900">용돈 충전하기</h1>
+        <h1 className="w-full text-center text-lg font-bold text-gray-900">💰 용돈 채우기</h1>
       </div>
 
       <div className="flex-1 px-6 pt-8 flex flex-col">
+        {/* Parent balance info */}
+        <div className="bg-gradient-to-br from-primary/10 to-accent/10 rounded-[20px] p-4 mb-6 flex items-center gap-3">
+          <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
+            <Wallet className="w-5 h-5 text-primary-foreground" />
+          </div>
+          <div>
+            <p className="text-xs text-gray-500 font-medium">현재 용돈 예산</p>
+            <p className="font-black text-gray-900 text-lg">₩{parent.balance.toLocaleString("ko-KR")}</p>
+          </div>
+        </div>
+
         {/* Child Selector */}
         <div className="mb-8">
           <h2 className="text-sm font-bold text-gray-500 mb-3">누구에게 보낼까요?</h2>
@@ -66,14 +77,14 @@ export default function ChargePage() {
                 key={child.id}
                 onClick={() => setSelectedChildId(child.id)}
                 className={`flex-1 py-4 px-3 rounded-[20px] border-2 transition-all flex flex-col items-center gap-2 ${
-                  selectedChildId === child.id 
-                    ? 'border-primary bg-primary/5 shadow-sm' 
-                    : 'border-gray-100 bg-white'
+                  selectedChildId === child.id
+                    ? "border-primary bg-primary/5 shadow-sm"
+                    : "border-gray-100 bg-white"
                 }`}
                 data-testid={`select-child-${child.id}`}
               >
                 <div className="text-3xl">{child.avatar}</div>
-                <span className={`font-bold ${selectedChildId === child.id ? 'text-primary-foreground' : 'text-gray-600'}`}>
+                <span className={`font-bold ${selectedChildId === child.id ? "text-primary-foreground" : "text-gray-600"}`}>
                   {child.name}
                 </span>
               </button>
@@ -85,8 +96,8 @@ export default function ChargePage() {
         <div className="mb-8">
           <h2 className="text-sm font-bold text-gray-500 mb-3">얼마를 보낼까요?</h2>
           <div className="relative mb-4">
-            <Input 
-              type="text" 
+            <Input
+              type="text"
               value={amount}
               onChange={handleAmountChange}
               placeholder="0"
@@ -104,20 +115,20 @@ export default function ChargePage() {
                 className="px-4 py-2 bg-gray-50 hover:bg-gray-100 rounded-full text-sm font-bold text-gray-700 transition-colors"
                 data-testid={`preset-${preset}`}
               >
-                +{preset.toLocaleString('ko-KR')}원
+                +{preset.toLocaleString("ko-KR")}원
               </button>
             ))}
           </div>
         </div>
-        
+
         <div className="mt-auto pb-12 pt-4">
-          <Button 
+          <Button
             onClick={handleCharge}
-            disabled={!amount || parseInt(amount.replace(/,/g, ''), 10) === 0}
-            className="w-full h-[60px] rounded-[20px] text-lg font-bold bg-primary hover:bg-primary/90 text-primary-foreground shadow-md"
+            disabled={!amount || parseInt(amount.replace(/,/g, ""), 10) === 0}
+            className="w-full h-[60px] rounded-[20px] text-lg font-bold bg-primary hover:bg-primary/90 text-white shadow-md"
             data-testid="btn-submit-charge"
           >
-            충전하기
+            용돈 보내기 💸
           </Button>
         </div>
       </div>

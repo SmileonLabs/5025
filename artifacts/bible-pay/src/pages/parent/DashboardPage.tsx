@@ -42,7 +42,7 @@ export default function DashboardPage() {
           className="w-full h-[56px] rounded-[16px] text-lg font-bold bg-primary hover:bg-primary/90 text-primary-foreground shadow-md"
           data-testid="btn-go-charge"
         >
-          💰 용돈 충전하기
+          💰 용돈 채우기
         </Button>
       </div>
 
