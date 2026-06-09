@@ -28,6 +28,18 @@ export interface Transaction {
   amount: number;
   description: string;
   type: TransactionType;
+  category?: string | null;
+}
+
+export interface ChildRequest {
+  id: number;
+  childId: number;
+  type: "allowance" | "mission" | "message";
+  message: string;
+  status: "pending" | "resolved" | "dismissed";
+  createdAt: string;
+  childName: string;
+  childAvatar: string;
 }
 
 export interface Mission {
@@ -58,8 +70,10 @@ interface AppState {
   currentChild: ChildData | null;
   children: ChildData[];
   transactions: Transaction[];
+  parentTransactions: Transaction[];
   missions: Mission[];
   pendingLogs: PendingLog[];
+  childRequests: ChildRequest[];
   // Auth
   login: (email: string, password: string) => Promise<void>;
   signup: (name: string, email: string, password: string) => Promise<void>;
@@ -84,7 +98,12 @@ interface AppState {
   rejectMissionLog: (logId: number) => Promise<void>;
   // Transactions
   chargeAllowance: (childId: number, amount: number) => Promise<void>;
-  spendAllowance: (childId: number, amount: number, purpose: string) => Promise<boolean>;
+  spendAllowance: (childId: number, amount: number, purpose: string, category?: string) => Promise<boolean>;
+  refreshParentTransactions: () => Promise<void>;
+  // Requests (child -> parent)
+  createRequest: (type: ChildRequest["type"], message: string) => Promise<void>;
+  refreshRequests: () => Promise<void>;
+  resolveRequest: (id: number, status: "resolved" | "dismissed") => Promise<void>;
 }
 
 const AppContext = createContext<AppState | undefined>(undefined);
@@ -96,8 +115,10 @@ export function AppProvider({ children: reactChildren }: { children: ReactNode }
   const [currentChild, setCurrentChild] = useState<ChildData | null>(null);
   const [children, setChildren] = useState<ChildData[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [parentTransactions, setParentTransactions] = useState<Transaction[]>([]);
   const [missions, setMissions] = useState<Mission[]>([]);
   const [pendingLogs, setPendingLogs] = useState<PendingLog[]>([]);
+  const [childRequests, setChildRequests] = useState<ChildRequest[]>([]);
 
   const refreshChildren = useCallback(async () => {
     try {
@@ -120,6 +141,20 @@ export function AppProvider({ children: reactChildren }: { children: ReactNode }
     } catch {}
   }, []);
 
+  const refreshParentTransactions = useCallback(async () => {
+    try {
+      const data = await api.get<Transaction[]>("/transactions/all");
+      setParentTransactions(data);
+    } catch {}
+  }, []);
+
+  const refreshRequests = useCallback(async () => {
+    try {
+      const data = await api.get<ChildRequest[]>("/requests");
+      setChildRequests(data);
+    } catch {}
+  }, []);
+
   // Restore session on mount
   useEffect(() => {
     (async () => {
@@ -128,14 +163,18 @@ export function AppProvider({ children: reactChildren }: { children: ReactNode }
         if (me.role === "parent") {
           setRole("parent");
           setParent({ id: me.id, name: me.name, email: me.email, balance: me.balance });
-          const [kids, missionList, pending] = await Promise.all([
+          const [kids, missionList, pending, parentTxs, requests] = await Promise.all([
             api.get<ChildData[]>("/children"),
             api.get<Mission[]>("/missions"),
             api.get<PendingLog[]>("/missions/pending"),
+            api.get<Transaction[]>("/transactions/all"),
+            api.get<ChildRequest[]>("/requests"),
           ]);
           setChildren(kids);
           setMissions(missionList);
           setPendingLogs(pending);
+          setParentTransactions(parentTxs);
+          setChildRequests(requests);
         } else if (me.role === "child") {
           setRole("child");
           setCurrentChild({ id: me.id, name: me.name, age: me.age, avatar: me.avatar, balance: me.balance, parentId: me.parentId });
@@ -159,14 +198,18 @@ export function AppProvider({ children: reactChildren }: { children: ReactNode }
     setParent(data);
     setRole("parent");
     setCurrentChild(null);
-    const [kids, missionList, pending] = await Promise.all([
+    const [kids, missionList, pending, parentTxs, requests] = await Promise.all([
       api.get<ChildData[]>("/children"),
       api.get<Mission[]>("/missions"),
       api.get<PendingLog[]>("/missions/pending"),
+      api.get<Transaction[]>("/transactions/all"),
+      api.get<ChildRequest[]>("/requests"),
     ]);
     setChildren(kids);
     setMissions(missionList);
     setPendingLogs(pending);
+    setParentTransactions(parentTxs);
+    setChildRequests(requests);
   };
 
   const signup = async (name: string, email: string, password: string) => {
@@ -177,6 +220,8 @@ export function AppProvider({ children: reactChildren }: { children: ReactNode }
     setChildren([]);
     setMissions([]);
     setPendingLogs([]);
+    setParentTransactions([]);
+    setChildRequests([]);
   };
 
   const logout = async () => {
@@ -186,8 +231,10 @@ export function AppProvider({ children: reactChildren }: { children: ReactNode }
     setCurrentChild(null);
     setChildren([]);
     setTransactions([]);
+    setParentTransactions([]);
     setMissions([]);
     setPendingLogs([]);
+    setChildRequests([]);
   };
 
   const childLogin = async (childId: number, pin: string) => {
@@ -269,14 +316,14 @@ export function AppProvider({ children: reactChildren }: { children: ReactNode }
     setParent(prev => prev ? { ...prev, balance: result.balance } : prev);
   };
 
-  const spendAllowance = async (childId: number, amount: number, purpose: string): Promise<boolean> => {
+  const spendAllowance = async (childId: number, amount: number, purpose: string, category?: string): Promise<boolean> => {
     try {
       const result = await api.post<{ childBalance: number; id: number; createdAt: string }>("/transactions", {
-        childId, amount: -amount, description: purpose, type: "spend",
+        childId, amount: -amount, description: purpose, type: "spend", category: category ?? null,
       });
       setCurrentChild(prev => prev ? { ...prev, balance: result.childBalance } : prev);
       setTransactions(prev => [{
-        id: result.id, childId, amount: -amount, description: purpose,
+        id: result.id, childId, amount: -amount, description: purpose, category: category ?? null,
         type: "spend", createdAt: result.createdAt ?? new Date().toISOString(),
       }, ...prev]);
       return true;
@@ -285,16 +332,26 @@ export function AppProvider({ children: reactChildren }: { children: ReactNode }
     }
   };
 
+  const createRequest = async (type: ChildRequest["type"], message: string) => {
+    await api.post("/requests", { type, message });
+  };
+
+  const resolveRequest = async (id: number, status: "resolved" | "dismissed") => {
+    await api.patch(`/requests/${id}`, { status });
+    setChildRequests(prev => prev.filter(r => r.id !== id));
+  };
+
   return (
     <AppContext.Provider value={{
-      role, loading, parent, currentChild, children, transactions, missions, pendingLogs,
+      role, loading, parent, currentChild, children, transactions, parentTransactions, missions, pendingLogs, childRequests,
       login, signup, logout, childLogin,
       topupParent,
       createChild, deleteChild, refreshChildren,
       createMission, updateMission, deleteMission, refreshMissions,
       submitMission,
       refreshPendingLogs, approveMissionLog, rejectMissionLog,
-      chargeAllowance, spendAllowance,
+      chargeAllowance, spendAllowance, refreshParentTransactions,
+      createRequest, refreshRequests, resolveRequest,
     }}>
       {reactChildren}
     </AppContext.Provider>

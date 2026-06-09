@@ -9,6 +9,7 @@ export const transactionsTable = pgTable("transactions", {
   amount: integer("amount").notNull(),
   description: text("description").notNull(),
   type: text("type").notNull().$type<"mission" | "charge" | "spend">(),
+  category: text("category"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

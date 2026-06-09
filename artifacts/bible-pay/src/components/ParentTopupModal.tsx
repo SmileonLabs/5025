@@ -242,7 +242,16 @@ export function ParentTopupModal({ open, onClose }: ParentTopupModalProps) {
                       <p className="text-3xl font-black text-blue-500">
                         +{numAmount.toLocaleString("ko-KR")}원
                       </p>
-                      <p className="text-sm text-gray-500 mt-2">
+                      {(() => {
+                        const m = METHODS.find(x => x.id === selectedMethod);
+                        return m ? (
+                          <div className="inline-flex items-center gap-1.5 mt-3 px-3 py-1.5 bg-gray-100 rounded-full" data-testid="done-method">
+                            <span className="text-base">{m.emoji}</span>
+                            <span className="text-sm font-bold text-gray-600">{m.label}로 충전</span>
+                          </div>
+                        ) : null;
+                      })()}
+                      <p className="text-sm text-gray-500 mt-3">
                         현재 잔액:{" "}
                         <span className="font-bold text-gray-700">
                           ₩{(parent?.balance ?? 0).toLocaleString("ko-KR")}

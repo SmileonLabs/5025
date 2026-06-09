@@ -1,11 +1,12 @@
 import React, { useState } from "react";
-import { useLocation } from "wouter";
+import { useLocation, useSearch } from "wouter";
 import { TrendingUp, TrendingDown, Plus } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAppContext, Transaction } from "@/context/AppContext";
 import { BottomNav } from "@/components/BottomNav";
 import { TransactionItem } from "@/components/TransactionItem";
 import { SpendModal } from "@/components/SpendModal";
+import { categoryEmoji } from "@/lib/spendCategories";
 
 function groupByDate(transactions: Transaction[]): { label: string; items: Transaction[] }[] {
   const map = new Map<string, Transaction[]>();
@@ -36,8 +37,14 @@ const FILTERS: Filter[] = ["전체", "번 돈", "쓴 돈"];
 
 export default function LedgerPage() {
   const [_, setLocation] = useLocation();
+  const search = useSearch();
+  const initialFilter: Filter = new URLSearchParams(search).get("filter") === "earned"
+    ? "번 돈"
+    : new URLSearchParams(search).get("filter") === "spent"
+    ? "쓴 돈"
+    : "전체";
   const { currentChild, transactions } = useAppContext();
-  const [filter, setFilter] = useState<Filter>("전체");
+  const [filter, setFilter] = useState<Filter>(initialFilter);
   const [spendOpen, setSpendOpen] = useState(false);
 
   React.useEffect(() => {
@@ -56,6 +63,18 @@ export default function LedgerPage() {
 
   const totalEarned = transactions.filter(t => t.amount > 0).reduce((s, t) => s + t.amount, 0);
   const totalSpent = transactions.filter(t => t.amount < 0).reduce((s, t) => s + Math.abs(t.amount), 0);
+
+  const categoryBreakdown = (() => {
+    const map = new Map<string, number>();
+    for (const t of transactions) {
+      if (t.type !== "spend") continue;
+      const key = t.category ?? "기타";
+      map.set(key, (map.get(key) ?? 0) + Math.abs(t.amount));
+    }
+    return Array.from(map.entries())
+      .map(([label, total]) => ({ label, total }))
+      .sort((a, b) => b.total - a.total);
+  })();
 
   const grouped = groupByDate(childTxs);
 
@@ -120,6 +139,33 @@ export default function LedgerPage() {
         </div>
       </div>
 
+      {filter !== "번 돈" && categoryBreakdown.length > 0 && (
+        <div className="px-6 pt-4">
+          <div className="bg-white rounded-[20px] p-5 shadow-sm border border-gray-100">
+            <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-3">어디에 썼을까? 🛍️</p>
+            <div className="space-y-2.5">
+              {categoryBreakdown.map(({ label, total }) => {
+                const pct = totalSpent > 0 ? Math.round((total / totalSpent) * 100) : 0;
+                return (
+                  <div key={label} className="flex items-center gap-3" data-testid={`breakdown-${label}`}>
+                    <span className="text-lg w-6 text-center">{categoryEmoji(label)}</span>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex justify-between items-center mb-1">
+                        <span className="text-sm font-bold text-gray-700 truncate">{label}</span>
+                        <span className="text-sm font-black text-gray-900 whitespace-nowrap ml-2">{total.toLocaleString("ko-KR")}원</span>
+                      </div>
+                      <div className="h-2 w-full bg-gray-100 rounded-full overflow-hidden">
+                        <div className="h-full bg-red-300 rounded-full" style={{ width: `${pct}%` }} />
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="px-6 pt-3 space-y-4">
         <AnimatePresence mode="wait">
           {grouped.length === 0 ? (
@@ -158,6 +204,7 @@ export default function LedgerPage() {
                       amount={tx.amount}
                       date={tx.createdAt}
                       type={tx.type}
+                      category={tx.category}
                     />
                   ))}
                 </div>

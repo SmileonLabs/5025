@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
-import { Plus, ChevronRight, LogOut, UserPlus, PlusCircle, ClipboardList } from "lucide-react";
+import { Plus, ChevronRight, LogOut, UserPlus, PlusCircle, ClipboardList, Check, X } from "lucide-react";
 import { useAppContext } from "@/context/AppContext";
 import { Button } from "@/components/ui/button";
 import { BibleIllustration } from "@/components/BibleIllustration";
@@ -8,9 +8,15 @@ import { TransactionItem } from "@/components/TransactionItem";
 import { ChildCreateModal } from "@/components/ChildCreateModal";
 import { ParentTopupModal } from "@/components/ParentTopupModal";
 
+const REQUEST_TYPE_META: Record<string, { emoji: string; label: string }> = {
+  allowance: { emoji: "💸", label: "용돈 요청" },
+  mission: { emoji: "📋", label: "미션 요청" },
+  message: { emoji: "💬", label: "메시지" },
+};
+
 export default function DashboardPage() {
   const [_, setLocation] = useLocation();
-  const { parent, children, transactions, logout, pendingLogs, missions } = useAppContext();
+  const { parent, children, parentTransactions, logout, pendingLogs, missions, childRequests, resolveRequest } = useAppContext();
   const [createOpen, setCreateOpen] = useState(false);
   const [topupOpen, setTopupOpen] = useState(false);
 
@@ -19,8 +25,13 @@ export default function DashboardPage() {
     return null;
   }
 
+  const childName = (childId: number) => children.find(c => c.id === childId)?.name ?? "";
   const totalBalance = children.reduce((sum, child) => sum + child.balance, 0);
-  const recentMissions = transactions.filter(t => t.type === "mission").slice(0, 3);
+  const recentMissions = parentTransactions
+    .filter(t => t.type === "mission")
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    .slice(0, 3);
+  const pendingRequests = childRequests.filter(r => r.status === "pending");
 
   const handleLogout = async () => {
     await logout();
@@ -106,6 +117,58 @@ export default function DashboardPage() {
       </div>
 
       <div className="px-6 space-y-8">
+        {pendingRequests.length > 0 && (
+          <section>
+            <div className="flex items-center gap-2 mb-4">
+              <h2 className="text-lg font-bold text-gray-900">아이들의 요청</h2>
+              <span className="w-6 h-6 bg-red-500 text-white text-xs font-black rounded-full flex items-center justify-center">
+                {pendingRequests.length}
+              </span>
+            </div>
+            <div className="space-y-3">
+              {pendingRequests.map(req => {
+                const meta = REQUEST_TYPE_META[req.type] ?? { emoji: "💬", label: "요청" };
+                return (
+                  <div
+                    key={req.id}
+                    className="bg-white rounded-[20px] p-4 shadow-sm border border-gray-100"
+                    data-testid={`request-${req.id}`}
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className="w-10 h-10 rounded-full bg-gray-50 flex items-center justify-center text-xl flex-shrink-0">
+                        {req.childAvatar || "🧒"}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-0.5">
+                          <span className="font-bold text-gray-900 text-sm">{req.childName}</span>
+                          <span className="text-xs font-bold text-gray-400">{meta.emoji} {meta.label}</span>
+                        </div>
+                        <p className="text-sm text-gray-600 break-words">{req.message}</p>
+                      </div>
+                    </div>
+                    <div className="flex gap-2 mt-3">
+                      <button
+                        onClick={() => resolveRequest(req.id, "resolved")}
+                        className="flex-1 flex items-center justify-center gap-1.5 h-10 rounded-[12px] bg-primary text-primary-foreground text-sm font-bold"
+                        data-testid={`btn-resolve-${req.id}`}
+                      >
+                        <Check className="w-4 h-4" /> 해결됨
+                      </button>
+                      <button
+                        onClick={() => resolveRequest(req.id, "dismissed")}
+                        className="px-4 flex items-center justify-center gap-1.5 h-10 rounded-[12px] bg-gray-100 text-gray-500 text-sm font-bold"
+                        data-testid={`btn-dismiss-${req.id}`}
+                      >
+                        <X className="w-4 h-4" /> 무시
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        )}
+
         <section>
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-lg font-bold text-gray-900">아이 잔고 현황</h2>
@@ -180,7 +243,11 @@ export default function DashboardPage() {
           <section>
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-lg font-bold text-gray-900">최근 완료한 미션</h2>
-              <button className="text-primary-foreground text-sm font-bold flex items-center">
+              <button
+                onClick={() => setLocation("/parent/history")}
+                className="text-primary-foreground text-sm font-bold flex items-center"
+                data-testid="btn-history-more"
+              >
                 더보기 <ChevronRight className="w-4 h-4" />
               </button>
             </div>
@@ -189,7 +256,7 @@ export default function DashboardPage() {
                 {recentMissions.map(tx => (
                   <TransactionItem
                     key={tx.id}
-                    description={tx.description}
+                    description={`${childName(tx.childId)} · ${tx.description}`}
                     amount={tx.amount}
                     date={tx.createdAt}
                     type={tx.type}

@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, ShoppingBag, Utensils, Gift, Pencil, Gamepad2, Heart, ChevronRight } from "lucide-react";
+import { X, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { useAppContext } from "@/context/AppContext";
+import { SPEND_CATEGORIES } from "@/lib/spendCategories";
 
 interface SpendModalProps {
   open: boolean;
@@ -14,14 +15,7 @@ interface SpendModalProps {
 
 type Step = "purpose" | "amount" | "confirm" | "done";
 
-const QUICK_CATEGORIES = [
-  { label: "간식 사 먹기", icon: Utensils, emoji: "🍔" },
-  { label: "학용품 사기", icon: Pencil, emoji: "✏️" },
-  { label: "선물 사기", icon: Gift, emoji: "🎁" },
-  { label: "장난감 사기", icon: Gamepad2, emoji: "🎮" },
-  { label: "친구한테 쓰기", icon: Heart, emoji: "💛" },
-  { label: "기타", icon: ShoppingBag, emoji: "🛍️" },
-];
+const QUICK_CATEGORIES = SPEND_CATEGORIES;
 
 const PRESET_AMOUNTS = [500, 1000, 2000, 3000, 5000];
 
@@ -55,7 +49,8 @@ export function SpendModal({ open, onClose, childId, balance }: SpendModalProps)
   const handleSubmit = async () => {
     if (!isAmountValid || !purpose.trim()) return;
     setIsSubmitting(true);
-    const success = await spendAllowance(childId, numAmount, purpose);
+    const category = selectedCategory || "기타";
+    const success = await spendAllowance(childId, numAmount, purpose, category);
     setIsSubmitting(false);
     if (success) {
       setStep("done");

@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { z } from "zod";
 import { db, transactionsTable, childrenTable, parentsTable } from "@workspace/db";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, inArray } from "drizzle-orm";
 
 const router = Router();
 
@@ -10,6 +10,7 @@ const CreateTxBody = z.object({
   amount: z.number().int(),
   description: z.string().min(1),
   type: z.enum(["mission", "charge", "spend"]),
+  category: z.string().max(50).optional(),
 });
 
 // GET /api/transactions — get transactions for logged-in child
@@ -26,6 +27,26 @@ router.get("/transactions", async (req, res) => {
   res.json(txs);
 });
 
+// GET /api/transactions/all — parent gets all their children's transactions
+router.get("/transactions/all", async (req, res) => {
+  if (!req.session?.parentId) {
+    res.status(401).json({ error: "부모님 로그인이 필요해요." });
+    return;
+  }
+  const kids = await db.select({ id: childrenTable.id }).from(childrenTable).where(eq(childrenTable.parentId, req.session.parentId));
+  const childIds = kids.map(k => k.id);
+  if (childIds.length === 0) {
+    res.json([]);
+    return;
+  }
+  const txs = await db
+    .select()
+    .from(transactionsTable)
+    .where(inArray(transactionsTable.childId, childIds))
+    .orderBy(desc(transactionsTable.createdAt));
+  res.json(txs);
+});
+
 // POST /api/transactions — create transaction (parent-authorized for charge; child for spend/mission)
 router.post("/transactions", async (req, res) => {
   const parsed = CreateTxBody.safeParse(req.body);
@@ -33,7 +54,7 @@ router.post("/transactions", async (req, res) => {
     res.status(400).json({ error: "입력값을 확인해주세요." });
     return;
   }
-  const { childId, amount, description, type } = parsed.data;
+  const { childId, amount, description, type, category } = parsed.data;
 
   const [child] = await db.select().from(childrenTable).where(eq(childrenTable.id, childId)).limit(1);
   if (!child) {
@@ -69,7 +90,7 @@ router.post("/transactions", async (req, res) => {
 
   const [tx] = await db
     .insert(transactionsTable)
-    .values({ childId, amount, description, type })
+    .values({ childId, amount, description, type, category: category ?? null })
     .returning();
 
   res.status(201).json({ ...tx, childBalance: newBalance });

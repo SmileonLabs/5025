@@ -1,12 +1,18 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { Bell, HelpCircle, Info, LogOut, ChevronRight } from "lucide-react";
 import { useAppContext } from "@/context/AppContext";
 import { BottomNav } from "@/components/BottomNav";
+import { NotificationSettingsModal } from "@/components/NotificationSettingsModal";
+import { RequestModal } from "@/components/RequestModal";
+import { AppInfoModal } from "@/components/AppInfoModal";
 
 export default function SettingsPage() {
   const [_, setLocation] = useLocation();
   const { currentChild, logout } = useAppContext();
+  const [notifSettingsOpen, setNotifSettingsOpen] = useState(false);
+  const [requestOpen, setRequestOpen] = useState(false);
+  const [appInfoOpen, setAppInfoOpen] = useState(false);
 
   useEffect(() => {
     if (!currentChild) setLocation("/login");
@@ -20,9 +26,9 @@ export default function SettingsPage() {
   };
 
   const menuItems = [
-    { icon: Bell, label: "알림 설정", color: "text-blue-500", bg: "bg-blue-50" },
-    { icon: HelpCircle, label: "부모님께 요청하기", color: "text-secondary-foreground", bg: "bg-secondary/20" },
-    { icon: Info, label: "앱 정보", color: "text-gray-500", bg: "bg-gray-100" },
+    { icon: Bell, label: "알림 설정", color: "text-blue-500", bg: "bg-blue-50", onClick: () => setNotifSettingsOpen(true), testid: "menu-notif-settings" },
+    { icon: HelpCircle, label: "부모님께 요청하기", color: "text-secondary-foreground", bg: "bg-secondary/20", onClick: () => setRequestOpen(true), testid: "menu-request" },
+    { icon: Info, label: "앱 정보", color: "text-gray-500", bg: "bg-gray-100", onClick: () => setAppInfoOpen(true), testid: "menu-appinfo" },
   ];
 
   return (
@@ -48,6 +54,8 @@ export default function SettingsPage() {
             return (
               <button
                 key={i}
+                onClick={item.onClick}
+                data-testid={item.testid}
                 className="w-full flex items-center justify-between p-4 border-b border-gray-50 last:border-0 hover:bg-gray-50 transition-colors"
               >
                 <div className="flex items-center gap-3">
@@ -72,6 +80,10 @@ export default function SettingsPage() {
       </div>
 
       <BottomNav />
+
+      <NotificationSettingsModal open={notifSettingsOpen} onClose={() => setNotifSettingsOpen(false)} />
+      <RequestModal open={requestOpen} onClose={() => setRequestOpen(false)} />
+      <AppInfoModal open={appInfoOpen} onClose={() => setAppInfoOpen(false)} />
     </div>
   );
 }

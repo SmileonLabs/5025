@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { useLocation } from "wouter";
 import { Bell, Award, ShoppingBag } from "lucide-react";
 import { useAppContext } from "@/context/AppContext";
@@ -6,16 +6,41 @@ import { BottomNav } from "@/components/BottomNav";
 import { MissionCard } from "@/components/MissionCard";
 import { BibleIllustration } from "@/components/BibleIllustration";
 import { SpendModal } from "@/components/SpendModal";
+import { NotificationsModal } from "@/components/NotificationsModal";
+import { getNotificationPrefs, getLastSeen, setLastSeen } from "@/lib/notificationPrefs";
 import { motion } from "framer-motion";
 
 export default function HomePage() {
   const [_, setLocation] = useLocation();
   const { currentChild, missions, transactions } = useAppContext();
   const [spendOpen, setSpendOpen] = useState(false);
+  const [notifOpen, setNotifOpen] = useState(false);
+  const [seenAt, setSeenAt] = useState(0);
 
   React.useEffect(() => {
     if (!currentChild) setLocation("/login");
+    else setSeenAt(getLastSeen(currentChild.id));
   }, [currentChild, setLocation]);
+
+  const hasUnread = useMemo(() => {
+    if (!currentChild) return false;
+    const prefs = getNotificationPrefs(currentChild.id);
+    const txUnread = transactions.some(t =>
+      new Date(t.createdAt).getTime() > seenAt &&
+      ((t.type === "mission" && prefs.mission) || (t.type === "charge" && prefs.charge))
+    );
+    const missionUnread = prefs.newMission && missions.some(m => m.isActive && new Date(m.createdAt).getTime() > seenAt);
+    return txUnread || missionUnread;
+  }, [currentChild, transactions, missions, seenAt]);
+
+  const openNotifications = () => {
+    if (currentChild) {
+      const now = Date.now();
+      setLastSeen(currentChild.id, now);
+      setSeenAt(now);
+    }
+    setNotifOpen(true);
+  };
 
   if (!currentChild) return null;
 
@@ -30,9 +55,11 @@ export default function HomePage() {
         <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2">
           안녕, {currentChild.name}! <span className="text-2xl">{currentChild.avatar}</span>
         </h1>
-        <button className="p-2 text-gray-500 bg-gray-50 rounded-full relative">
+        <button onClick={openNotifications} className="p-2 text-gray-500 bg-gray-50 rounded-full relative" data-testid="btn-notifications">
           <Bell className="w-6 h-6" />
-          <span className="absolute top-2 right-2 w-2 h-2 bg-red-400 rounded-full border-2 border-white" />
+          {hasUnread && (
+            <span className="absolute top-2 right-2 w-2 h-2 bg-red-400 rounded-full border-2 border-white" />
+          )}
         </button>
       </div>
 
@@ -69,11 +96,19 @@ export default function HomePage() {
 
         {/* Quick Stats */}
         <div className="flex gap-3">
-          <div className="flex-1 bg-white rounded-[20px] p-4 shadow-sm border border-gray-100">
+          <button
+            onClick={() => setLocation("/child/ledger?filter=earned")}
+            className="flex-1 bg-white rounded-[20px] p-4 shadow-sm border border-gray-100 text-left active:scale-[0.98] transition-transform"
+            data-testid="stat-earned"
+          >
             <p className="text-xs text-gray-400 font-medium mb-1">총 번 용돈</p>
             <p className="font-black text-emerald-500 text-base">+{totalEarned.toLocaleString("ko-KR")}원</p>
-          </div>
-          <div className="flex-1 bg-white rounded-[20px] p-4 shadow-sm border border-gray-100 flex items-center gap-3">
+          </button>
+          <button
+            onClick={() => setLocation("/child/ledger?filter=earned")}
+            className="flex-1 bg-white rounded-[20px] p-4 shadow-sm border border-gray-100 flex items-center gap-3 text-left active:scale-[0.98] transition-transform"
+            data-testid="stat-missions"
+          >
             <div className="w-9 h-9 rounded-full bg-accent/20 flex items-center justify-center">
               <Award className="w-4 h-4 text-accent-foreground" />
             </div>
@@ -81,7 +116,7 @@ export default function HomePage() {
               <p className="text-xs text-gray-400 font-medium">완료한 미션</p>
               <p className="font-black text-gray-900">{completedMissionsCount}개</p>
             </div>
-          </div>
+          </button>
         </div>
 
         {/* Today's Mission */}
@@ -120,6 +155,8 @@ export default function HomePage() {
         childId={currentChild.id}
         balance={currentChild.balance}
       />
+
+      <NotificationsModal open={notifOpen} onClose={() => setNotifOpen(false)} />
     </div>
   );
 }

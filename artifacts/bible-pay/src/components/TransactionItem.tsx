@@ -1,11 +1,13 @@
 import { BookOpen, Coins, ShoppingBag } from "lucide-react";
 import { TransactionType } from "@/context/AppContext";
+import { categoryEmoji } from "@/lib/spendCategories";
 
 interface TransactionItemProps {
   description: string;
   amount: number;
   date: string;
   type: TransactionType;
+  category?: string | null;
 }
 
 const TYPE_CONFIG: Record<TransactionType, { icon: React.ComponentType<{ className?: string }>, bgClass: string, iconClass: string, emoji: string }> = {
@@ -19,20 +21,27 @@ function formatDate(dateStr: string): string {
   return `${d.getMonth() + 1}월 ${d.getDate()}일`;
 }
 
-export function TransactionItem({ description, amount, date, type }: TransactionItemProps) {
+export function TransactionItem({ description, amount, date, type, category }: TransactionItemProps) {
   const isPositive = amount > 0;
   const config = TYPE_CONFIG[type];
   const Icon = config.icon;
+  const showCategoryEmoji = type === "spend" && !!category;
 
   return (
     <div className="flex items-center gap-3 py-3.5 border-b border-gray-50 last:border-0" data-testid="transaction-item">
       <div className={`w-11 h-11 rounded-[14px] flex items-center justify-center flex-shrink-0 ${config.bgClass}`}>
-        <Icon className={`w-5 h-5 ${config.iconClass}`} />
+        {showCategoryEmoji ? (
+          <span className="text-xl">{categoryEmoji(category)}</span>
+        ) : (
+          <Icon className={`w-5 h-5 ${config.iconClass}`} />
+        )}
       </div>
 
       <div className="flex-1 min-w-0">
         <p className="font-semibold text-gray-900 text-sm truncate">{description}</p>
-        <p className="text-xs text-gray-400 mt-0.5">{formatDate(date)}</p>
+        <p className="text-xs text-gray-400 mt-0.5">
+          {formatDate(date)}{showCategoryEmoji ? ` · ${category}` : ""}
+        </p>
       </div>
 
       <div className={`font-black text-base whitespace-nowrap tabular-nums ${isPositive ? "text-emerald-500" : "text-red-500"}`}>
