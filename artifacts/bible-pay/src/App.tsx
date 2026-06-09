@@ -10,10 +10,12 @@ import ParentAuthPage from "@/pages/ParentAuthPage";
 import ChildSelectPage from "@/pages/ChildSelectPage";
 import DashboardPage from "@/pages/parent/DashboardPage";
 import ChargePage from "@/pages/parent/ChargePage";
+import ParentMissionsPage from "@/pages/parent/MissionsPage";
 import HomePage from "@/pages/child/HomePage";
 import MissionsPage from "@/pages/child/MissionsPage";
 import LedgerPage from "@/pages/child/LedgerPage";
 import SettingsPage from "@/pages/child/SettingsPage";
+import BibleChapterPage from "@/pages/child/BibleChapterPage";
 import QuizPage from "@/pages/child/QuizPage";
 
 const queryClient = new QueryClient();
@@ -29,11 +31,13 @@ function Router() {
 
       <Route path="/parent/dashboard" component={DashboardPage} />
       <Route path="/parent/charge" component={ChargePage} />
+      <Route path="/parent/missions" component={ParentMissionsPage} />
 
       <Route path="/child/home" component={HomePage} />
       <Route path="/child/missions" component={MissionsPage} />
       <Route path="/child/ledger" component={LedgerPage} />
       <Route path="/child/settings" component={SettingsPage} />
+      <Route path="/child/bible/:missionId" component={BibleChapterPage} />
       <Route path="/child/quiz/:missionId" component={QuizPage} />
 
       <Route component={NotFound} />

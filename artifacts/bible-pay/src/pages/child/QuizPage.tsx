@@ -1,6 +1,6 @@
-import { useState } from "react";
-import { useLocation, useParams } from "wouter";
-import { ChevronLeft, BookOpen, Star, Loader2, CheckCircle2, XCircle, Sparkles } from "lucide-react";
+import { useState, useEffect } from "react";
+import { useLocation, useParams, useSearch } from "wouter";
+import { ChevronLeft, Star, Loader2, CheckCircle2, XCircle, Sparkles } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAppContext } from "@/context/AppContext";
 import { Button } from "@/components/ui/button";
@@ -12,31 +12,7 @@ interface QuizQuestion {
   correctIndex: number;
 }
 
-type FlowStep = "select" | "loading" | "quiz" | "result";
-
-const BIBLE_BOOKS = [
-  "창세기", "출애굽기", "레위기", "민수기", "신명기",
-  "여호수아", "사사기", "룻기", "사무엘상", "사무엘하",
-  "시편", "잠언", "전도서", "이사야", "예레미야",
-  "마태복음", "마가복음", "누가복음", "요한복음",
-  "사도행전", "로마서", "고린도전서", "갈라디아서",
-  "에베소서", "빌립보서", "요한계시록"
-];
-
-const MOCK_QUIZZES: Record<string, QuizQuestion[]> = {
-  default: [
-    { question: "하나님께서 세상을 만드실 때 첫째 날 만드신 것은 무엇인가요?", options: ["🌊 바다", "💡 빛", "🌿 풀과 나무", "⭐ 별"], correctIndex: 1 },
-    { question: "하나님이 세상을 다 만드시고 마지막 날에 하신 일은 무엇인가요?", options: ["🐟 물고기를 만드셨어요", "🌈 무지개를 만드셨어요", "😴 쉬셨어요", "🏔️ 산을 만드셨어요"], correctIndex: 2 },
-  ],
-  "시편 23편": [
-    { question: "시편 23편에서 하나님을 무엇에 비유하나요?", options: ["👑 왕", "🐑 목자", "🌊 강", "🦅 독수리"], correctIndex: 1 },
-    { question: "시편 23편에서 목자는 나를 어디로 인도하나요?", options: ["🏔️ 높은 산으로", "🌲 푸른 초장으로", "🌊 깊은 바다로", "🌆 큰 도시로"], correctIndex: 1 },
-  ],
-  "요한복음 3:16": [
-    { question: "요한복음 3장 16절에서 하나님은 세상을 어떻게 하셨나요?", options: ["만드셨어요", "사랑하셨어요", "심판하셨어요", "잊으셨어요"], correctIndex: 1 },
-    { question: "하나님이 독생자를 주신 이유는 무엇인가요?", options: ["세상을 아름답게 하려고", "우리가 멸망하지 않고 영생을 얻게 하려고", "천사들을 보내려고", "성전을 짓게 하려고"], correctIndex: 1 },
-  ],
-};
+type FlowStep = "loading" | "quiz" | "result";
 
 function ConfettiPiece({ index }: { index: number }) {
   const colors = ["#FFE066", "#A8EDCB", "#C8B8F8", "#FFD6B0", "#FF8FAB", "#7DD3FC"];
@@ -58,14 +34,18 @@ function ConfettiPiece({ index }: { index: number }) {
 export default function QuizPage() {
   const [_, setLocation] = useLocation();
   const params = useParams<{ missionId: string }>();
-  const { currentChild, missions, completeMission } = useAppContext();
+  const search = useSearch();
+  const { currentChild, missions, submitMission } = useAppContext();
   const { toast } = useToast();
 
-  const mission = missions.find(m => m.id === params.missionId);
+  const missionId = parseInt(params.missionId, 10);
+  const mission = missions.find(m => m.id === missionId);
 
-  const [step, setStep] = useState<FlowStep>("select");
-  const [selectedBook, setSelectedBook] = useState(mission?.title ?? "");
-  const [customPassage, setCustomPassage] = useState("");
+  const searchParams = new URLSearchParams(search);
+  const bibleBook = searchParams.get("book") ?? "";
+  const bibleChapter = parseInt(searchParams.get("chapter") ?? "0", 10);
+
+  const [step, setStep] = useState<FlowStep>("loading");
   const [questions, setQuestions] = useState<QuizQuestion[]>([]);
   const [currentQ, setCurrentQ] = useState(0);
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
@@ -73,26 +53,29 @@ export default function QuizPage() {
   const [showFeedback, setShowFeedback] = useState(false);
   const [showConfetti, setShowConfetti] = useState(false);
   const [rewardGranted, setRewardGranted] = useState(false);
+  const [finalBalance, setFinalBalance] = useState<number | null>(null);
 
-  const passage = customPassage || selectedBook;
-  const reward = mission?.reward ?? 500;
+  if (!currentChild) { setLocation("/login"); return null; }
+  if (!mission) { setLocation("/child/missions"); return null; }
 
-  if (!currentChild) {
-    setLocation("/login");
-    return null;
-  }
+  const passage = bibleBook && bibleChapter ? `${bibleBook} ${bibleChapter}장` : mission.title;
+  const reward = mission.reward;
 
   const fetchQuiz = async () => {
-    if (!passage.trim()) {
-      toast({ title: "성경 구절을 선택하거나 입력해주세요!", variant: "destructive" });
-      return;
-    }
     setStep("loading");
+    setCurrentQ(0);
+    setAnsweredCorrectly([]);
+    setSelectedAnswer(null);
+    setShowFeedback(false);
+    setRewardGranted(false);
+    setFinalBalance(null);
+
     try {
       const res = await fetch("/api/quiz/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ passage, bookName: selectedBook || passage }),
+        credentials: "include",
+        body: JSON.stringify({ passage, bookName: bibleBook || mission.title }),
       });
       if (!res.ok) throw new Error("API error");
       const data = await res.json() as { questions: QuizQuestion[] };
@@ -100,17 +83,16 @@ export default function QuizPage() {
         setQuestions(data.questions.slice(0, 2));
       } else throw new Error("Invalid quiz data");
     } catch {
-      const mockKey = Object.keys(MOCK_QUIZZES).find(k => passage.includes(k)) ?? "default";
-      setQuestions(MOCK_QUIZZES[mockKey]);
-      toast({ title: "🔌 오프라인 퀴즈로 진행합니다!", description: "연결이 안 될 때도 퀴즈를 풀 수 있어요." });
-    } finally {
-      setStep("quiz");
-      setCurrentQ(0);
-      setAnsweredCorrectly([]);
-      setSelectedAnswer(null);
-      setShowFeedback(false);
+      toast({ title: "퀴즈 생성에 실패했어요. 다시 시도해주세요.", variant: "destructive" });
+      setLocation(`/child/bible/${missionId}`);
+      return;
     }
+    setStep("quiz");
   };
+
+  useEffect(() => {
+    fetchQuiz();
+  }, []);
 
   const handleSelectAnswer = (idx: number) => {
     if (showFeedback) return;
@@ -129,13 +111,21 @@ export default function QuizPage() {
         setAnsweredCorrectly(newAnswers);
         setStep("result");
         const allCorrect = newAnswers.every(Boolean);
-        if (allCorrect && !rewardGranted && mission) {
-          setShowConfetti(true);
+        if (allCorrect && !rewardGranted) {
           setRewardGranted(true);
+          setShowConfetti(true);
           try {
-            await completeMission(mission.id, currentChild.id);
-          } catch {
-            toast({ title: "부모님이 용돈을 충전해 주셔야 해요!", variant: "destructive" });
+            const result = await submitMission(missionId, {
+              bibleBook: bibleBook || undefined,
+              bibleChapter: bibleChapter || undefined,
+            });
+            setFinalBalance(result.childBalance);
+          } catch (err: any) {
+            if (err?.status === 409) {
+              toast({ title: "이미 완료한 장이에요!", description: "다른 장에 도전해보세요." });
+            } else {
+              toast({ title: "보상 지급에 실패했어요.", variant: "destructive" });
+            }
           }
         }
       }
@@ -148,92 +138,27 @@ export default function QuizPage() {
     <div className="min-h-[100dvh] bg-gray-50 flex flex-col">
       <div className="bg-white px-4 py-4 flex items-center border-b border-gray-100 sticky top-0 z-40">
         <button
-          onClick={() => step === "quiz" || step === "result" ? setStep("select") : setLocation("/child/home")}
+          onClick={() => bibleBook ? setLocation(`/child/bible/${missionId}`) : setLocation("/child/missions")}
           className="p-2 text-gray-600 hover:bg-gray-100 rounded-full mr-2"
           data-testid="btn-back"
         >
           <ChevronLeft className="w-6 h-6" />
         </button>
-        <h1 className="text-lg font-bold text-gray-900">성경 읽기 확인</h1>
+        <div>
+          <h1 className="text-lg font-bold text-gray-900">성경 퀴즈</h1>
+          {bibleBook && <p className="text-xs text-gray-400">{passage}</p>}
+        </div>
       </div>
 
       <div className="flex-1 px-6 py-6 flex flex-col">
         <AnimatePresence mode="wait">
-          {step === "select" && (
-            <motion.div key="select" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="flex flex-col gap-6 flex-1">
-              <div className="bg-gradient-to-br from-mint/30 to-purple/20 rounded-[24px] p-6 text-center">
-                <div className="text-5xl mb-3">📖</div>
-                <h2 className="text-xl font-bold text-gray-900 mb-1">오늘 어떤 성경을 읽었나요?</h2>
-                <p className="text-gray-500 text-sm">읽은 구절을 선택하면 퀴즈를 낼게요!</p>
-              </div>
-
-              {mission && (
-                <div>
-                  <p className="text-xs font-bold text-gray-500 mb-2 uppercase tracking-wide">오늘의 미션</p>
-                  <button
-                    onClick={() => { setSelectedBook(mission.title); setCustomPassage(""); }}
-                    className={`w-full p-4 rounded-[20px] border-2 text-left transition-all flex items-center gap-3 ${
-                      selectedBook === mission.title && !customPassage ? "border-primary bg-primary/5" : "border-gray-100 bg-white"
-                    }`}
-                    data-testid="btn-select-mission"
-                  >
-                    <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
-                      <BookOpen className="w-5 h-5 text-primary-foreground" />
-                    </div>
-                    <div>
-                      <p className="font-bold text-gray-900">{mission.title}</p>
-                      <p className="text-xs text-gray-500 italic">"{mission.verse.slice(0, 30)}..."</p>
-                    </div>
-                    <div className="ml-auto bg-accent/20 text-accent-foreground px-3 py-1 rounded-full text-sm font-bold">
-                      +{mission.reward}원
-                    </div>
-                  </button>
-                </div>
-              )}
-
-              <div>
-                <p className="text-xs font-bold text-gray-500 mb-2 uppercase tracking-wide">다른 성경 구절</p>
-                <div className="flex flex-wrap gap-2 mb-4">
-                  {BIBLE_BOOKS.slice(0, 12).map(book => (
-                    <button
-                      key={book}
-                      onClick={() => { setSelectedBook(book); setCustomPassage(""); }}
-                      className={`px-3 py-2 rounded-full text-sm font-bold transition-all ${
-                        selectedBook === book && !customPassage ? "bg-primary text-white" : "bg-white border border-gray-200 text-gray-600"
-                      }`}
-                      data-testid={`book-${book}`}
-                    >
-                      {book}
-                    </button>
-                  ))}
-                </div>
-                <input
-                  type="text"
-                  placeholder="직접 입력 (예: 잠언 3장 5절)"
-                  value={customPassage}
-                  onChange={e => { setCustomPassage(e.target.value); setSelectedBook(""); }}
-                  className="w-full px-4 py-3 rounded-[16px] border border-gray-200 bg-white text-sm font-medium focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
-                  data-testid="input-custom-passage"
-                />
-              </div>
-
-              <div className="mt-auto">
-                <Button
-                  onClick={fetchQuiz}
-                  disabled={!passage.trim()}
-                  className="w-full h-[56px] rounded-[16px] font-bold text-base bg-primary hover:bg-primary/90 text-white"
-                  data-testid="btn-start-quiz"
-                >
-                  ✅ 퀴즈 풀러 가기!
-                </Button>
-              </div>
-            </motion.div>
-          )}
-
           {step === "loading" && (
             <motion.div key="loading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex-1 flex flex-col items-center justify-center gap-6">
-              <motion.div animate={{ rotate: 360 }} transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-                className="w-16 h-16 rounded-full bg-gradient-to-tr from-primary/40 to-accent/40 flex items-center justify-center">
+              <motion.div
+                animate={{ rotate: 360 }}
+                transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+                className="w-16 h-16 rounded-full bg-gradient-to-tr from-primary/40 to-accent/40 flex items-center justify-center"
+              >
                 <Loader2 className="w-8 h-8 text-primary-foreground" />
               </motion.div>
               <div className="text-center">
@@ -254,7 +179,7 @@ export default function QuizPage() {
                 </div>
               </div>
 
-              <div className="bg-gradient-to-br from-mint/20 to-purple/10 rounded-[24px] p-6">
+              <div className="bg-gradient-to-br from-blue-50 to-purple-50 rounded-[24px] p-6">
                 <div className="text-3xl mb-3 text-center">🤔</div>
                 <p className="text-lg font-bold text-gray-900 text-center leading-snug">{questions[currentQ].question}</p>
               </div>
@@ -269,9 +194,13 @@ export default function QuizPage() {
                     btnStyle = "border-2 border-primary bg-primary/5 text-gray-900";
                   }
                   return (
-                    <motion.button key={idx} onClick={() => handleSelectAnswer(idx)} whileTap={{ scale: 0.98 }}
+                    <motion.button
+                      key={idx}
+                      onClick={() => handleSelectAnswer(idx)}
+                      whileTap={{ scale: 0.98 }}
                       className={`w-full p-4 rounded-[16px] text-left font-medium text-sm transition-all flex items-center gap-3 ${btnStyle}`}
-                      data-testid={`answer-option-${idx}`}>
+                      data-testid={`answer-option-${idx}`}
+                    >
                       <span className="w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center text-xs font-bold shrink-0">
                         {["①", "②", "③", "④"][idx]}
                       </span>
@@ -295,8 +224,12 @@ export default function QuizPage() {
 
               {allCorrect ? (
                 <>
-                  <motion.div initial={{ scale: 0 }} animate={{ scale: [0, 1.3, 1] }} transition={{ duration: 0.6, ease: "backOut" }}
-                    className="w-28 h-28 rounded-full bg-gradient-to-br from-yellow-300 to-primary flex items-center justify-center shadow-lg">
+                  <motion.div
+                    initial={{ scale: 0 }}
+                    animate={{ scale: [0, 1.3, 1] }}
+                    transition={{ duration: 0.6, ease: "backOut" }}
+                    className="w-28 h-28 rounded-full bg-gradient-to-br from-yellow-300 to-primary flex items-center justify-center shadow-lg"
+                  >
                     <Sparkles className="w-14 h-14 text-white" />
                   </motion.div>
                   <div className="text-center">
@@ -306,18 +239,24 @@ export default function QuizPage() {
                     <motion.p initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }} className="text-gray-600 mb-1">
                       2문제 모두 맞혔어요!
                     </motion.p>
-                    <motion.div initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.7 }}
-                      className="inline-block bg-gradient-to-r from-yellow-400 to-accent px-6 py-3 rounded-full mt-2 shadow-md">
-                      <p className="text-white font-black text-lg">용돈이 쏙 들어왔어요! +{reward.toLocaleString("ko-KR")}원 💰</p>
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.8 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      transition={{ delay: 0.7 }}
+                      className="inline-block bg-gradient-to-r from-yellow-400 to-accent px-6 py-3 rounded-full mt-2 shadow-md"
+                    >
+                      <p className="text-white font-black text-lg">+{reward.toLocaleString("ko-KR")}원 지급! 💰</p>
                     </motion.div>
                   </div>
-                  <div className="flex items-center gap-2 bg-white rounded-[20px] px-5 py-4 shadow-sm border border-gray-100 w-full">
-                    <Star className="w-5 h-5 text-yellow-400 fill-yellow-400" />
-                    <p className="text-sm font-bold text-gray-700">
-                      {currentChild.name}의 잔액:{" "}
-                      <span className="text-primary-foreground font-black">₩{currentChild.balance.toLocaleString("ko-KR")}</span>
-                    </p>
-                  </div>
+                  {finalBalance !== null && (
+                    <div className="flex items-center gap-2 bg-white rounded-[20px] px-5 py-4 shadow-sm border border-gray-100 w-full">
+                      <Star className="w-5 h-5 text-yellow-400 fill-yellow-400" />
+                      <p className="text-sm font-bold text-gray-700">
+                        현재 잔액:{" "}
+                        <span className="text-primary-foreground font-black">₩{finalBalance.toLocaleString("ko-KR")}</span>
+                      </p>
+                    </div>
+                  )}
                 </>
               ) : (
                 <>
@@ -333,13 +272,16 @@ export default function QuizPage() {
 
               <div className="flex flex-col gap-3 w-full mt-4">
                 {!allCorrect && (
-                  <Button onClick={() => { setStep("select"); setSelectedAnswer(null); setShowFeedback(false); setAnsweredCorrectly([]); setCurrentQ(0); setRewardGranted(false); }}
-                    className="w-full h-[52px] rounded-[14px] font-bold bg-primary hover:bg-primary/90 text-white" data-testid="btn-retry">
-                    다시 도전하기!
+                  <Button onClick={fetchQuiz} className="w-full h-[52px] rounded-[14px] font-bold bg-primary hover:bg-primary/90 text-white" data-testid="btn-retry">
+                    다시 도전하기! (새 문제)
                   </Button>
                 )}
-                <Button onClick={() => setLocation("/child/home")} variant="outline"
-                  className="w-full h-[52px] rounded-[14px] font-bold border-gray-200" data-testid="btn-go-home">
+                {allCorrect && bibleBook && (
+                  <Button onClick={() => setLocation(`/child/bible/${missionId}`)} variant="outline" className="w-full h-[52px] rounded-[14px] font-bold border-gray-200" data-testid="btn-another-chapter">
+                    다른 장도 읽기 📖
+                  </Button>
+                )}
+                <Button onClick={() => setLocation("/child/home")} variant="outline" className="w-full h-[52px] rounded-[14px] font-bold border-gray-200" data-testid="btn-go-home">
                   홈으로 돌아가기
                 </Button>
               </div>

@@ -4,6 +4,7 @@ import quizRouter from "./quiz";
 import authRouter from "./auth";
 import childrenRouter from "./children";
 import transactionsRouter from "./transactions";
+import missionsRouter from "./missions";
 
 const router: IRouter = Router();
 
@@ -12,5 +13,6 @@ router.use(quizRouter);
 router.use(authRouter);
 router.use(childrenRouter);
 router.use(transactionsRouter);
+router.use(missionsRouter);
 
 export default router;

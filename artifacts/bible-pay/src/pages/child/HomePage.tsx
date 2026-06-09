@@ -19,7 +19,7 @@ export default function HomePage() {
 
   if (!currentChild) return null;
 
-  const todaysMission = missions.find(m => !m.completed) || missions[0];
+  const featuredMission = missions.find(m => m.isActive) ?? missions[0];
 
   const totalEarned = transactions.filter(t => t.amount > 0).reduce((s, t) => s + t.amount, 0);
   const completedMissionsCount = transactions.filter(t => t.type === "mission").length;
@@ -85,10 +85,10 @@ export default function HomePage() {
         </div>
 
         {/* Today's Mission */}
-        {todaysMission && (
+        {featuredMission && (
           <section>
             <div className="flex justify-between items-center mb-3">
-              <h2 className="text-lg font-bold text-gray-900">오늘의 성경 읽기</h2>
+              <h2 className="text-lg font-bold text-gray-900">오늘의 미션</h2>
               <button
                 onClick={() => setLocation("/child/missions")}
                 className="text-primary-foreground text-sm font-bold"
@@ -97,8 +97,16 @@ export default function HomePage() {
                 전체보기
               </button>
             </div>
-            <MissionCard mission={todaysMission} childId={currentChild.id} />
+            <MissionCard mission={featuredMission} childId={currentChild.id} />
           </section>
+        )}
+
+        {missions.length === 0 && (
+          <div className="bg-white rounded-[24px] p-6 shadow-sm border border-gray-100 text-center">
+            <div className="text-4xl mb-2">📋</div>
+            <p className="font-bold text-gray-700">아직 미션이 없어요</p>
+            <p className="text-sm text-gray-400 mt-1">부모님이 미션을 만들어 주실 거예요!</p>
+          </div>
         )}
 
         <BibleIllustration />

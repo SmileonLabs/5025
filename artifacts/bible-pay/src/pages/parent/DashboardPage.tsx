@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
-import { Plus, ChevronRight, LogOut, UserPlus, PlusCircle } from "lucide-react";
+import { Plus, ChevronRight, LogOut, UserPlus, PlusCircle, ClipboardList } from "lucide-react";
 import { useAppContext } from "@/context/AppContext";
 import { Button } from "@/components/ui/button";
 import { BibleIllustration } from "@/components/BibleIllustration";
@@ -10,7 +10,7 @@ import { ParentTopupModal } from "@/components/ParentTopupModal";
 
 export default function DashboardPage() {
   const [_, setLocation] = useLocation();
-  const { parent, children, transactions, logout } = useAppContext();
+  const { parent, children, transactions, logout, pendingLogs, missions } = useAppContext();
   const [createOpen, setCreateOpen] = useState(false);
   const [topupOpen, setTopupOpen] = useState(false);
 
@@ -80,6 +80,19 @@ export default function DashboardPage() {
             data-testid="btn-go-charge"
           >
             💰 용돈 채우기
+          </Button>
+          <Button
+            onClick={() => setLocation("/parent/missions")}
+            variant="outline"
+            className="h-[52px] px-4 rounded-[16px] font-bold border-gray-200 relative"
+            data-testid="btn-go-missions"
+          >
+            <ClipboardList className="w-5 h-5" />
+            {pendingLogs.length > 0 && (
+              <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-[10px] font-black rounded-full flex items-center justify-center">
+                {pendingLogs.length}
+              </span>
+            )}
           </Button>
           <Button
             onClick={() => setCreateOpen(true)}
