@@ -16,13 +16,15 @@ export interface Child {
   avatar: string;
 }
 
+export type TransactionType = "mission" | "charge" | "spend";
+
 export interface Transaction {
   id: string;
   childId: string;
   date: string;
   amount: number;
   description: string;
-  type: "mission" | "charge";
+  type: TransactionType;
 }
 
 export interface Mission {
@@ -48,6 +50,7 @@ interface AppState {
   completeMission: (missionId: string, childId: string) => void;
   chargeAllowance: (childId: string, amount: number) => void;
   rewardChild: (childId: string, amount: number, description: string) => boolean;
+  spendAllowance: (childId: string, amount: number, purpose: string) => boolean;
 }
 
 const initialMissions: Mission[] = [
@@ -61,10 +64,21 @@ const initialChildren: Child[] = [
   { id: "c2", name: "김도현", age: 7, balance: 8000, avatar: "⭐" }
 ];
 
+const now = new Date();
+const yesterday = new Date(now.getTime() - 86400000);
+const twoDaysAgo = new Date(now.getTime() - 86400000 * 2);
+const threeDaysAgo = new Date(now.getTime() - 86400000 * 3);
+
 const initialTransactions: Transaction[] = [
-  { id: "t1", childId: "c1", date: new Date().toISOString(), amount: 500, description: "잠언 1장 읽기 완료", type: "mission" },
-  { id: "t2", childId: "c1", date: new Date(Date.now() - 86400000).toISOString(), amount: 5000, description: "용돈 채우기", type: "charge" },
-  { id: "t3", childId: "c2", date: new Date().toISOString(), amount: 300, description: "시편 23편 읽기 완료", type: "mission" },
+  { id: "t1", childId: "c1", date: now.toISOString(), amount: 500, description: "잠언 1장 퀴즈 완료 🎉", type: "mission" },
+  { id: "t2", childId: "c1", date: now.toISOString(), amount: -800, description: "문구점에서 연필 사기 ✏️", type: "spend" },
+  { id: "t3", childId: "c1", date: yesterday.toISOString(), amount: 5000, description: "용돈 채우기", type: "charge" },
+  { id: "t4", childId: "c1", date: yesterday.toISOString(), amount: -1500, description: "떡볶이 냠냠 🌶️", type: "spend" },
+  { id: "t5", childId: "c1", date: twoDaysAgo.toISOString(), amount: 300, description: "시편 23편 퀴즈 완료 🎉", type: "mission" },
+  { id: "t6", childId: "c1", date: threeDaysAgo.toISOString(), amount: -2000, description: "친구 생일 선물 🎁", type: "spend" },
+  { id: "t7", childId: "c2", date: now.toISOString(), amount: 300, description: "시편 23편 퀴즈 완료 🎉", type: "mission" },
+  { id: "t8", childId: "c2", date: yesterday.toISOString(), amount: 3000, description: "용돈 채우기", type: "charge" },
+  { id: "t9", childId: "c2", date: yesterday.toISOString(), amount: -500, description: "아이스크림 🍦", type: "spend" },
 ];
 
 const AppContext = createContext<AppState | undefined>(undefined);
@@ -82,9 +96,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const completeMission = (missionId: string, childId: string) => {
     const mission = missions.find(m => m.id === missionId);
     if (!mission || mission.completed) return;
-
     setMissions(prev => prev.map(m => m.id === missionId ? { ...m, completed: true, completedAt: new Date().toISOString() } : m));
-
     const newTx: Transaction = {
       id: `tx_${Date.now()}`,
       childId,
@@ -100,7 +112,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const rewardChild = (childId: string, amount: number, description: string): boolean => {
     if (parentBalance < amount) return false;
-
     const newTx: Transaction = {
       id: `tx_${Date.now()}`,
       childId,
@@ -129,6 +140,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setParentBalance(prev => prev + amount);
   };
 
+  const spendAllowance = (childId: string, amount: number, purpose: string): boolean => {
+    const child = childrenState.find(c => c.id === childId);
+    if (!child || child.balance < amount) return false;
+    const newTx: Transaction = {
+      id: `tx_${Date.now()}`,
+      childId,
+      date: new Date().toISOString(),
+      amount: -amount,
+      description: purpose,
+      type: "spend"
+    };
+    setTransactions(prev => [newTx, ...prev]);
+    setChildrenState(prev => prev.map(c => c.id === childId ? { ...c, balance: c.balance - amount } : c));
+    return true;
+  };
+
   return (
     <AppContext.Provider value={{
       role, setRole,
@@ -140,6 +167,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       completeMission,
       chargeAllowance,
       rewardChild,
+      spendAllowance,
     }}>
       {children}
     </AppContext.Provider>

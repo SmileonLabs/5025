@@ -1,39 +1,42 @@
-import { Book, Coins } from "lucide-react";
-import { formatDistanceToNow, isToday, isYesterday } from "date-fns";
-import { ko } from "date-fns/locale";
+import { BookOpen, Coins, ShoppingBag } from "lucide-react";
+import { TransactionType } from "@/context/AppContext";
 
 interface TransactionItemProps {
   description: string;
   amount: number;
   date: string;
-  type: "mission" | "charge";
+  type: TransactionType;
+}
+
+const TYPE_CONFIG: Record<TransactionType, { icon: React.ComponentType<{ className?: string }>, bgClass: string, iconClass: string, emoji: string }> = {
+  mission: { icon: BookOpen, bgClass: "bg-green-50", iconClass: "text-green-600", emoji: "📖" },
+  charge:  { icon: Coins,    bgClass: "bg-blue-50",  iconClass: "text-blue-500",  emoji: "💰" },
+  spend:   { icon: ShoppingBag, bgClass: "bg-red-50", iconClass: "text-red-400", emoji: "🛍️" },
+};
+
+function formatDate(dateStr: string): string {
+  const d = new Date(dateStr);
+  return `${d.getMonth() + 1}월 ${d.getDate()}일`;
 }
 
 export function TransactionItem({ description, amount, date, type }: TransactionItemProps) {
   const isPositive = amount > 0;
-  
-  const formattedDate = () => {
-    const d = new Date(date);
-    if (isToday(d)) return "오늘";
-    if (isYesterday(d)) return "어제";
-    return formatDistanceToNow(d, { addSuffix: true, locale: ko });
-  };
+  const config = TYPE_CONFIG[type];
+  const Icon = config.icon;
 
   return (
-    <div className="flex items-center gap-4 py-4 border-b border-gray-50 last:border-0" data-testid="transaction-item">
-      <div className={`w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 ${
-        type === 'mission' ? 'bg-secondary/30 text-secondary-foreground' : 'bg-accent/30 text-accent-foreground'
-      }`}>
-        {type === 'mission' ? <Book className="w-6 h-6" /> : <Coins className="w-6 h-6" />}
+    <div className="flex items-center gap-3 py-3.5 border-b border-gray-50 last:border-0" data-testid="transaction-item">
+      <div className={`w-11 h-11 rounded-[14px] flex items-center justify-center flex-shrink-0 ${config.bgClass}`}>
+        <Icon className={`w-5 h-5 ${config.iconClass}`} />
       </div>
-      
+
       <div className="flex-1 min-w-0">
-        <h4 className="font-semibold text-gray-900 truncate">{description}</h4>
-        <p className="text-xs text-gray-500">{formattedDate()}</p>
+        <p className="font-semibold text-gray-900 text-sm truncate">{description}</p>
+        <p className="text-xs text-gray-400 mt-0.5">{formatDate(date)}</p>
       </div>
-      
-      <div className={`font-bold text-lg whitespace-nowrap ${isPositive ? 'text-primary-foreground' : 'text-gray-900'}`}>
-        {isPositive ? '+' : ''}{amount.toLocaleString('ko-KR')}원
+
+      <div className={`font-black text-base whitespace-nowrap tabular-nums ${isPositive ? "text-emerald-500" : "text-red-500"}`}>
+        {isPositive ? "+" : ""}{amount.toLocaleString("ko-KR")}원
       </div>
     </div>
   );
