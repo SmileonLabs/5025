@@ -1,16 +1,18 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
-import { Plus, ChevronRight, LogOut, UserPlus } from "lucide-react";
+import { Plus, ChevronRight, LogOut, UserPlus, PlusCircle } from "lucide-react";
 import { useAppContext } from "@/context/AppContext";
 import { Button } from "@/components/ui/button";
 import { BibleIllustration } from "@/components/BibleIllustration";
 import { TransactionItem } from "@/components/TransactionItem";
 import { ChildCreateModal } from "@/components/ChildCreateModal";
+import { ParentTopupModal } from "@/components/ParentTopupModal";
 
 export default function DashboardPage() {
   const [_, setLocation] = useLocation();
   const { parent, children, transactions, logout } = useAppContext();
   const [createOpen, setCreateOpen] = useState(false);
+  const [topupOpen, setTopupOpen] = useState(false);
 
   if (!parent) {
     setLocation("/");
@@ -38,18 +40,40 @@ export default function DashboardPage() {
           </button>
         </div>
 
-        <div className="flex gap-4 mb-6">
-          <div className="flex-1 bg-primary/10 rounded-[20px] p-4 border border-primary/20">
-            <p className="text-sm font-medium text-primary-foreground/80 mb-1">아이들 총 잔액</p>
-            <p className="text-2xl font-bold text-primary-foreground">{totalBalance.toLocaleString("ko-KR")}원</p>
+        {/* Parent budget card */}
+        <div className="bg-gradient-to-br from-blue-500 to-blue-700 rounded-[20px] p-5 mb-5 relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-full blur-xl translate-x-1/2 -translate-y-1/2" />
+          <div className="relative z-10 flex items-center justify-between">
+            <div>
+              <p className="text-blue-100 text-sm font-medium mb-1">내 예산 잔액</p>
+              <p className="text-3xl font-black text-white">₩{parent.balance.toLocaleString("ko-KR")}</p>
+            </div>
+            <button
+              onClick={() => setTopupOpen(true)}
+              className="flex items-center gap-1.5 bg-white/20 hover:bg-white/30 backdrop-blur-sm px-4 py-2.5 rounded-full text-white text-sm font-bold transition-colors"
+              data-testid="btn-open-topup"
+            >
+              <PlusCircle className="w-4 h-4" />
+              충전
+            </button>
           </div>
-          <div className="flex-1 bg-secondary/20 rounded-[20px] p-4 border border-secondary/30">
-            <p className="text-sm font-medium text-secondary-foreground/80 mb-1">아이 수</p>
-            <p className="text-2xl font-bold text-secondary-foreground">{children.length}명</p>
+          <p className="text-blue-200 text-xs mt-2 font-medium relative z-10">
+            아이들 용돈은 이 예산에서 나가요
+          </p>
+        </div>
+
+        <div className="flex gap-3 mb-1">
+          <div className="flex-1 bg-primary/10 rounded-[18px] p-3.5 border border-primary/20">
+            <p className="text-xs font-medium text-primary-foreground/70 mb-0.5">아이들 총 잔액</p>
+            <p className="text-xl font-bold text-primary-foreground">{totalBalance.toLocaleString("ko-KR")}원</p>
+          </div>
+          <div className="flex-1 bg-secondary/20 rounded-[18px] p-3.5 border border-secondary/30">
+            <p className="text-xs font-medium text-secondary-foreground/70 mb-0.5">아이 수</p>
+            <p className="text-xl font-bold text-secondary-foreground">{children.length}명</p>
           </div>
         </div>
 
-        <div className="flex gap-3">
+        <div className="flex gap-3 mt-4">
           <Button
             onClick={() => setLocation("/parent/charge")}
             className="flex-1 h-[52px] rounded-[16px] text-base font-bold bg-primary hover:bg-primary/90 text-primary-foreground shadow-md"
@@ -154,6 +178,7 @@ export default function DashboardPage() {
       </div>
 
       <ChildCreateModal open={createOpen} onClose={() => setCreateOpen(false)} />
+      <ParentTopupModal open={topupOpen} onClose={() => setTopupOpen(false)} />
     </div>
   );
 }

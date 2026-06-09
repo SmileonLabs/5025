@@ -59,6 +59,8 @@ interface AppState {
   signup: (name: string, email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   childLogin: (childId: number, pin: string) => Promise<void>;
+  // Parent top-up
+  topupParent: (amount: number) => Promise<void>;
   // Child management
   createChild: (name: string, age: number, avatar: string, pin: string) => Promise<void>;
   deleteChild: (childId: number) => Promise<void>;
@@ -193,6 +195,11 @@ export function AppProvider({ children: reactChildren }: { children: ReactNode }
     }
   };
 
+  const topupParent = async (amount: number) => {
+    const result = await api.post<{ balance: number }>("/auth/topup", { amount });
+    setParent(prev => prev ? { ...prev, balance: result.balance } : prev);
+  };
+
   const spendAllowance = async (childId: number, amount: number, purpose: string): Promise<boolean> => {
     try {
       const result = await api.post<{ childBalance: number; id: number; createdAt: string }>("/transactions", {
@@ -220,6 +227,7 @@ export function AppProvider({ children: reactChildren }: { children: ReactNode }
     <AppContext.Provider value={{
       role, loading, parent, currentChild, children, transactions, missions,
       login, signup, logout, childLogin,
+      topupParent,
       createChild, deleteChild, refreshChildren,
       completeMission, chargeAllowance, spendAllowance,
     }}>
