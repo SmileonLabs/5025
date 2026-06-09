@@ -1,20 +1,29 @@
 /* Custom service worker (vite-plugin-pwa injectManifest strategy).
  * Adds Web Push handling on top of Workbox precaching so the parent can
  * receive notifications even when the app is closed. */
-import { precacheAndRoute, createHandlerBoundToURL } from "workbox-precaching";
+import { precacheAndRoute, createHandlerBoundToURL, type PrecacheEntry } from "workbox-precaching";
 import { NavigationRoute, registerRoute } from "workbox-routing";
 import { CacheFirst } from "workbox-strategies";
 import { ExpirationPlugin } from "workbox-expiration";
 import { clientsClaim } from "workbox-core";
 
-// DOM lib already provides ServiceWorkerGlobalScope / PushEvent / NotificationEvent.
+// `self.__WB_MANIFEST` is the literal injection point that vite-plugin-pwa (workbox)
+// replaces with the precache manifest at build time — it MUST appear verbatim in the
+// source, otherwise the production build fails with "Unable to find a place to inject
+// the manifest". Declaring it on the global scope keeps that literal token type-safe.
+declare global {
+  // eslint-disable-next-line no-var
+  var __WB_MANIFEST: Array<PrecacheEntry | string>;
+}
+
+// DOM/webworker lib provides ServiceWorkerGlobalScope / PushEvent / NotificationEvent.
 const sw = self as unknown as ServiceWorkerGlobalScope;
 
 sw.skipWaiting();
 clientsClaim();
 
 // Precache build assets injected by vite-plugin-pwa at build time.
-precacheAndRoute((sw as unknown as { __WB_MANIFEST: Array<{ url: string; revision: string | null }> }).__WB_MANIFEST || []);
+precacheAndRoute(self.__WB_MANIFEST);
 
 // SPA navigation fallback (precache only contains index.html in production builds).
 if (import.meta.env.PROD) {
