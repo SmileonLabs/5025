@@ -40,11 +40,7 @@ export interface Mission {
   completedAt?: string;
 }
 
-const INITIAL_MISSIONS: Mission[] = [
-  { id: "m1", title: "창세기 1장", verse: "태초에 하나님이 천지를 창조하시니라", reward: 500, completed: false, dueDate: "오늘" },
-  { id: "m2", title: "시편 23편", verse: "여호와는 나의 목자시니 내게 부족함이 없으리로다", reward: 300, completed: false, dueDate: "내일" },
-  { id: "m3", title: "요한복음 3:16", verse: "하나님이 세상을 이처럼 사랑하사 독생자를 주셨으니...", reward: 400, completed: false, dueDate: "이번 주" },
-];
+const INITIAL_MISSIONS: Mission[] = [];
 
 interface AppState {
   role: Role;
