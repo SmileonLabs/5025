@@ -38,7 +38,7 @@ export default defineConfig({
       srcDir: "src",
       filename: "sw.ts",
       registerType: "autoUpdate",
-      includeAssets: ["pwa-192.png", "pwa-512.png", "apple-touch-icon.png", "favicon.png"],
+      includeAssets: ["pwa-192.png", "pwa-512.png", "pwa-512-maskable.png", "apple-touch-icon.png", "favicon.png"],
       manifest: {
         name: "5025",
         short_name: "5025",
@@ -61,6 +61,12 @@ export default defineConfig({
             sizes: "512x512",
             type: "image/png",
             purpose: "any",
+          },
+          {
+            src: "pwa-512-maskable.png",
+            sizes: "512x512",
+            type: "image/png",
+            purpose: "maskable",
           },
         ],
       },
