@@ -12,13 +12,7 @@ interface ParentTopupModalProps {
 
 const PRESET_AMOUNTS = [10000, 30000, 50000, 100000];
 
-const METHODS = [
-  { id: "card", label: "신용·체크카드", emoji: "💳" },
-  { id: "bank", label: "계좌이체", emoji: "🏦" },
-  { id: "kakao", label: "카카오페이", emoji: "💛" },
-];
-
-type Step = "amount" | "method";
+type Step = "amount" | "confirm";
 
 export function ParentTopupModal({ open, onClose }: ParentTopupModalProps) {
   const { startTopupCheckout, parent } = useAppContext();
@@ -26,7 +20,6 @@ export function ParentTopupModal({ open, onClose }: ParentTopupModalProps) {
 
   const [step, setStep] = useState<Step>("amount");
   const [amount, setAmount] = useState("");
-  const [selectedMethod, setSelectedMethod] = useState("card");
   const [loading, setLoading] = useState(false);
 
   const numAmount = parseInt(amount.replace(/,/g, ""), 10);
@@ -35,7 +28,7 @@ export function ParentTopupModal({ open, onClose }: ParentTopupModalProps) {
   const handleClose = () => {
     setStep("amount");
     setAmount("");
-    setSelectedMethod("card");
+    setLoading(false);
     onClose();
   };
 
@@ -81,7 +74,7 @@ export function ParentTopupModal({ open, onClose }: ParentTopupModalProps) {
               <div className="flex items-center justify-between py-4 mb-1">
                 <h2 className="text-xl font-black text-gray-900">
                   {step === "amount" && "💰 예산 충전하기"}
-                  {step === "method" && "결제 방법 선택"}
+                  {step === "confirm" && "결제 확인"}
                 </h2>
                 <button
                   onClick={handleClose}
@@ -149,7 +142,7 @@ export function ParentTopupModal({ open, onClose }: ParentTopupModalProps) {
                     </div>
 
                     <Button
-                      onClick={() => setStep("method")}
+                      onClick={() => setStep("confirm")}
                       disabled={!isValid}
                       className="w-full h-[54px] rounded-[16px] font-bold text-base bg-blue-500 hover:bg-blue-600 text-white"
                       data-testid="btn-topup-next"
@@ -159,10 +152,10 @@ export function ParentTopupModal({ open, onClose }: ParentTopupModalProps) {
                   </motion.div>
                 )}
 
-                {/* STEP 2: 결제 방법 */}
-                {step === "method" && (
+                {/* STEP 2: 결제 확인 */}
+                {step === "confirm" && (
                   <motion.div
-                    key="method"
+                    key="confirm"
                     initial={{ opacity: 0, x: 20 }}
                     animate={{ opacity: 1, x: 0 }}
                     exit={{ opacity: 0, x: -20 }}
@@ -174,31 +167,14 @@ export function ParentTopupModal({ open, onClose }: ParentTopupModalProps) {
                       </p>
                     </div>
 
-                    <p className="text-sm font-bold text-gray-500 mb-3">결제 방법을 선택해주세요</p>
+                    <p className="text-sm font-bold text-gray-500 mb-3">결제 수단</p>
 
-                    <div className="space-y-3 mb-6">
-                      {METHODS.map(m => (
-                        <button
-                          key={m.id}
-                          onClick={() => setSelectedMethod(m.id)}
-                          className={`w-full flex items-center gap-4 p-4 rounded-[18px] border-2 transition-all ${
-                            selectedMethod === m.id
-                              ? "border-blue-400 bg-blue-50"
-                              : "border-gray-100 bg-white"
-                          }`}
-                          data-testid={`method-${m.id}`}
-                        >
-                          <span className="text-2xl">{m.emoji}</span>
-                          <span className={`font-bold ${selectedMethod === m.id ? "text-blue-700" : "text-gray-700"}`}>
-                            {m.label}
-                          </span>
-                          {selectedMethod === m.id && (
-                            <div className="ml-auto w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center">
-                              <div className="w-2 h-2 rounded-full bg-white" />
-                            </div>
-                          )}
-                        </button>
-                      ))}
+                    <div className="flex items-center gap-4 p-4 rounded-[18px] border-2 border-blue-400 bg-blue-50 mb-6">
+                      <span className="text-2xl">💳</span>
+                      <span className="font-bold text-blue-700">신용·체크카드</span>
+                      <div className="ml-auto w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center">
+                        <div className="w-2 h-2 rounded-full bg-white" />
+                      </div>
                     </div>
 
                     <p className="text-xs text-gray-400 text-center mb-4 leading-relaxed">

@@ -1,2 +1,3 @@
 - [bible-pay mission result in transactions](bible-pay-mission-result.md) — mission result lives in mission_logs (join on transaction_id), not on the transaction; legacy rows may have null reflection.
 - [stripe-replit-sync managed webhooks](stripe-replit-sync-webhooks.md) — managed webhook secret isn't in connection settings; processWebhook returns void; credit via redirect-confirm, not webhook.
+- [bible-pay PWA dev cache](bible-pay-pwa-dev-cache.md) — "change didn't apply" is usually a stale SW-cached bundle / installed PWA / un-republished prod, not broken code; verify code then suspect cache.
