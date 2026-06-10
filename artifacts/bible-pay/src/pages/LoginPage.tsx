@@ -35,7 +35,7 @@ export default function LoginPage() {
             initial={{ scale: 0.8, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             transition={{ type: "spring", bounce: 0.5 }}
-            className="w-60 max-w-[80%] mx-auto mb-2 drop-shadow-sm"
+            className="w-60 max-w-[80%] mx-auto mb-2"
           />
           <motion.h1
             initial={{ y: 20, opacity: 0 }}
