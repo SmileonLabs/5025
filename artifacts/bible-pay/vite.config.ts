@@ -73,10 +73,12 @@ export default defineConfig({
       injectManifest: {
         globPatterns: ["**/*.{js,css,html,svg,png,ico,woff2}"],
       },
+      // Service worker is disabled in development. With devOptions enabled the SW
+      // (skipWaiting + clientsClaim) seizes control of every tab and, together with
+      // Vite HMR, can serve outdated module chunks — leaving the app stuck on the
+      // splash/blank screen. The PWA service worker still ships in production builds.
       devOptions: {
-        enabled: true,
-        type: "module",
-        navigateFallback: "index.html",
+        enabled: false,
       },
     }),
     ...(process.env.NODE_ENV !== "production" &&
