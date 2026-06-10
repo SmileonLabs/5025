@@ -4,6 +4,7 @@ export * from "./transactions";
 export * from "./topups";
 export * from "./missions";
 export * from "./missionLogs";
+export * from "./missionAssignments";
 export * from "./requests";
 export * from "./pushSubscriptions";
 export * from "./gifticonOrders";

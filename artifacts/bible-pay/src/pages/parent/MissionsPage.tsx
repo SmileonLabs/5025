@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
-import { ChevronLeft, Plus, Trash2, ToggleLeft, ToggleRight, CheckCircle, XCircle, Clock, Camera, CalendarDays } from "lucide-react";
+import { ChevronLeft, Plus, Trash2, ToggleLeft, ToggleRight, CheckCircle, XCircle, Clock, Camera, CalendarDays, Users } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useAppContext, type Mission, type MissionScheduleType, type PendingLog } from "@/context/AppContext";
+import { useAppContext, type Mission, type MissionScheduleType, type PendingLog, type ChildData } from "@/context/AppContext";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 
@@ -21,7 +21,7 @@ function todayKst(): string {
 }
 
 function MissionCreateModal({ onClose }: { onClose: () => void }) {
-  const { createMission } = useAppContext();
+  const { createMission, children } = useAppContext();
   const { toast } = useToast();
   const [type, setType] = useState<Mission["type"]>("bible");
   const [title, setTitle] = useState("");
@@ -31,7 +31,17 @@ function MissionCreateModal({ onClose }: { onClose: () => void }) {
   const [scheduledDate, setScheduledDate] = useState("");
   const [timeLimit, setTimeLimit] = useState("");
   const [requiresPhoto, setRequiresPhoto] = useState(false);
+  const [assignToAll, setAssignToAll] = useState(true);
+  const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [saving, setSaving] = useState(false);
+
+  const selectAll = () => { setAssignToAll(true); setSelectedIds([]); };
+  const toggleChild = (id: number) => {
+    const next = selectedIds.includes(id) ? selectedIds.filter(x => x !== id) : [...selectedIds, id];
+    setSelectedIds(next);
+    // 아무도 선택 안 하면 자동으로 "전체"로 되돌림 (불변식 유지)
+    setAssignToAll(next.length === 0);
+  };
 
   const handleSubmit = async () => {
     if (!title.trim()) { toast({ title: "미션 이름을 입력해주세요.", variant: "destructive" }); return; }
@@ -51,6 +61,8 @@ function MissionCreateModal({ onClose }: { onClose: () => void }) {
         scheduledDate: type === "activity" && scheduleType === "once" ? scheduledDate : null,
         timeLimit: type === "activity" && timeLimit ? timeLimit : null,
         requiresPhoto: type === "activity" ? requiresPhoto : false,
+        assignToAll: children.length === 0 ? true : assignToAll,
+        childIds: children.length === 0 || assignToAll ? undefined : selectedIds,
       });
       toast({ title: "미션이 추가됐어요! 🎉" });
       onClose();
@@ -133,6 +145,47 @@ function MissionCreateModal({ onClose }: { onClose: () => void }) {
             />
             <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-bold">P</span>
           </div>
+        </div>
+
+        <div>
+          <p className="text-sm font-bold text-gray-600 mb-2">대상 아이</p>
+          {children.length === 0 ? (
+            <p className="text-xs text-gray-400 bg-gray-50 rounded-xl px-3 py-2">
+              아직 등록된 아이가 없어요. 모든 아이에게 적용돼요.
+            </p>
+          ) : (
+            <div className="space-y-2">
+              <button
+                onClick={selectAll}
+                className={`w-full py-2.5 rounded-[14px] border-2 text-sm font-bold flex items-center justify-center gap-1.5 transition-all ${
+                  assignToAll ? "border-primary bg-primary/5 text-gray-900" : "border-gray-100 bg-white text-gray-500"
+                }`}
+                data-testid="assign-all"
+              >
+                <Users className="w-4 h-4" /> 전체 아이
+              </button>
+              <div className="flex flex-wrap gap-2">
+                {children.map(c => {
+                  const active = !assignToAll && selectedIds.includes(c.id);
+                  return (
+                    <button
+                      key={c.id}
+                      onClick={() => toggleChild(c.id)}
+                      className={`flex items-center gap-1.5 px-3 py-2 rounded-[14px] border-2 text-sm font-bold transition-all ${
+                        active ? "border-primary bg-primary/5 text-gray-900" : "border-gray-100 bg-white text-gray-500"
+                      }`}
+                      data-testid={`assign-child-${c.id}`}
+                    >
+                      <span className="text-base">{c.avatar}</span> {c.name}
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="text-[11px] text-gray-400">
+                {assignToAll ? "지금 있는·앞으로 추가될 모든 아이에게 보여요." : `선택한 ${selectedIds.length}명에게만 보여요.`}
+              </p>
+            </div>
+          )}
         </div>
 
         {type === "activity" && (
@@ -295,9 +348,19 @@ function MissionMeta({ m }: { m: Mission }) {
   );
 }
 
+function MissionTargetBadge({ m, kids }: { m: Mission; kids: ChildData[] }) {
+  const cls = "inline-flex items-center gap-1 mt-1.5 text-[10px] font-bold text-violet-600 bg-violet-50 rounded-full px-2 py-0.5";
+  if (m.assignToAll) {
+    return <span className={cls}><Users className="w-2.5 h-2.5" /> 전체 아이</span>;
+  }
+  const names = m.assignedChildIds.map(id => kids.find(k => k.id === id)?.name).filter(Boolean) as string[];
+  const label = names.length > 0 ? names.join(", ") : `아이 ${m.assignedChildIds.length}명`;
+  return <span className={cls}><Users className="w-2.5 h-2.5" /> {label}</span>;
+}
+
 export default function ParentMissionsPage() {
   const [_, setLocation] = useLocation();
-  const { missions, pendingLogs, updateMission, deleteMission, approveMissionLog, rejectMissionLog } = useAppContext();
+  const { missions, children, pendingLogs, updateMission, deleteMission, approveMissionLog, rejectMissionLog } = useAppContext();
   const { toast } = useToast();
   const [createOpen, setCreateOpen] = useState(false);
   const [tab, setTab] = useState<"missions" | "pending">("missions");
@@ -387,6 +450,7 @@ export default function ParentMissionsPage() {
                         {m.description && <p className="text-xs text-gray-500 mt-0.5 truncate">{m.description}</p>}
                         <p className="text-sm font-black text-primary-foreground mt-1">+{m.reward.toLocaleString("ko-KR")}P</p>
                         <MissionMeta m={m} />
+                        <MissionTargetBadge m={m} kids={children} />
                       </div>
                       <div className="flex items-center gap-1 shrink-0">
                         <button onClick={() => handleToggle(m)} className={`p-1 rounded-lg transition-colors ${m.isActive ? "text-green-500" : "text-gray-300"}`}>

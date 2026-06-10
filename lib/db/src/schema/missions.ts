@@ -14,6 +14,9 @@ export const missionsTable = pgTable("missions", {
   scheduledDate: date("scheduled_date"), // scheduleType === "once" 일 때 지정일 (YYYY-MM-DD)
   timeLimit: text("time_limit"), // "HH:MM" 마감 시각(KST). null이면 제한 없음
   requiresPhoto: boolean("requires_photo").notNull().default(false), // 인증샷 필요 여부
+  // true(기본)면 부모의 모든 아이가 대상(동적). false면 mission_assignments에 명시된 아이만 대상.
+  // 불변식: assignToAll=true이면 assignments 행이 없어야 한다.
+  assignToAll: boolean("assign_to_all").notNull().default(true),
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });

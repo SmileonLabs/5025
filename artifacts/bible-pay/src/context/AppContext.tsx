@@ -58,6 +58,9 @@ export interface Mission {
   scheduledDate: string | null;
   timeLimit: string | null;
   requiresPhoto: boolean;
+  // 대상 아이: assignToAll=true면 부모의 모든 아이. false면 assignedChildIds에 명시된 아이만.
+  assignToAll: boolean;
+  assignedChildIds: number[];
   isActive: boolean;
   createdAt: string;
 }
@@ -72,6 +75,9 @@ export interface MissionInput {
   scheduledDate?: string | null;
   timeLimit?: string | null;
   requiresPhoto: boolean;
+  // assignToAll=false면 childIds에 대상 아이를 명시 (생략 시 전체 대상)
+  assignToAll?: boolean;
+  childIds?: number[];
 }
 
 export interface PendingLog {
@@ -150,7 +156,7 @@ interface AppState {
   refreshChildren: () => Promise<void>;
   // Mission management (parent)
   createMission: (data: MissionInput) => Promise<void>;
-  updateMission: (id: number, data: Partial<Pick<Mission, "title" | "description" | "reward" | "isActive" | "scheduleType" | "scheduledDate" | "timeLimit" | "requiresPhoto">>) => Promise<void>;
+  updateMission: (id: number, data: Partial<Pick<Mission, "title" | "description" | "reward" | "isActive" | "scheduleType" | "scheduledDate" | "timeLimit" | "requiresPhoto" | "assignToAll">> & { childIds?: number[] }) => Promise<void>;
   deleteMission: (id: number) => Promise<void>;
   refreshMissions: () => Promise<void>;
   // Mission actions (child)
@@ -373,7 +379,7 @@ export function AppProvider({ children: reactChildren }: { children: ReactNode }
     setMissions(prev => [mission, ...prev]);
   };
 
-  const updateMission = async (id: number, data: Partial<Pick<Mission, "title" | "description" | "reward" | "isActive" | "scheduleType" | "scheduledDate" | "timeLimit" | "requiresPhoto">>) => {
+  const updateMission = async (id: number, data: Partial<Pick<Mission, "title" | "description" | "reward" | "isActive" | "scheduleType" | "scheduledDate" | "timeLimit" | "requiresPhoto" | "assignToAll">> & { childIds?: number[] }) => {
     const updated = await api.patch<Mission>(`/missions/${id}`, data);
     setMissions(prev => prev.map(m => m.id === id ? updated : m));
   };

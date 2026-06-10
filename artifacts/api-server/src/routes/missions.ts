@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { z } from "zod";
-import { db, missionsTable, missionLogsTable, childrenTable, transactionsTable } from "@workspace/db";
-import { eq, and, desc, inArray, sql } from "drizzle-orm";
+import { db, missionsTable, missionLogsTable, missionAssignmentsTable, childrenTable, transactionsTable } from "@workspace/db";
+import { eq, and, desc, inArray, sql, or, exists } from "drizzle-orm";
 import { sendPushToParent } from "../lib/push";
 
 const router = Router();
@@ -41,17 +41,31 @@ const MissionFields = z.object({
     .nullable()
     .optional(),
   requiresPhoto: z.boolean().default(false),
+  // 대상 아이: assignToAll=true면 부모의 모든 아이(동적). false면 childIds에 명시된 아이만.
+  assignToAll: z.boolean().default(true),
+  childIds: z.array(z.number().int().positive()).optional(),
   isActive: z.boolean().default(true),
 });
 
 // scheduleType === "once" 이면 지정일(scheduledDate)이 반드시 있어야 한다.
+// assignToAll=false 이면 childIds가 1명 이상 있어야 한다.
 const CreateMissionBody = MissionFields.refine(
   (v) => v.scheduleType !== "once" || !!v.scheduledDate,
   { message: "지정일을 선택해주세요.", path: ["scheduledDate"] },
+).refine(
+  (v) => v.assignToAll || (v.childIds != null && v.childIds.length > 0),
+  { message: "대상 아이를 선택해주세요.", path: ["childIds"] },
 );
 const UpdateMissionBody = MissionFields.partial().refine(
   (v) => v.scheduleType !== "once" || v.scheduledDate != null,
   { message: "지정일을 선택해주세요.", path: ["scheduledDate"] },
+).refine(
+  (v) => v.assignToAll !== false || (v.childIds != null && v.childIds.length > 0),
+  { message: "대상 아이를 선택해주세요.", path: ["childIds"] },
+).refine(
+  // childIds만 보내면 라우트가 조용히 무시하므로(assignToAll 미명시 시 재설정 안 함) 명시를 강제
+  (v) => v.childIds === undefined || v.assignToAll !== undefined,
+  { message: "대상을 바꾸려면 assignToAll을 함께 보내주세요.", path: ["assignToAll"] },
 );
 
 // GET /api/missions
@@ -62,16 +76,50 @@ router.get("/missions", async (req, res) => {
       .from(missionsTable)
       .where(eq(missionsTable.parentId, req.session.parentId))
       .orderBy(desc(missionsTable.createdAt));
-    res.json(missions);
+    // assignToAll=false 미션의 대상 아이 목록을 한 번에 조회해 그룹핑
+    const scopedIds = missions.filter((m) => !m.assignToAll).map((m) => m.id);
+    const assignMap = new Map<number, number[]>();
+    if (scopedIds.length > 0) {
+      const rows = await db
+        .select({ missionId: missionAssignmentsTable.missionId, childId: missionAssignmentsTable.childId })
+        .from(missionAssignmentsTable)
+        .where(inArray(missionAssignmentsTable.missionId, scopedIds));
+      for (const r of rows) {
+        const arr = assignMap.get(r.missionId) ?? [];
+        arr.push(r.childId);
+        assignMap.set(r.missionId, arr);
+      }
+    }
+    res.json(missions.map((m) => ({ ...m, assignedChildIds: m.assignToAll ? [] : assignMap.get(m.id) ?? [] })));
     return;
   }
   if (req.session?.childId) {
     const [child] = await db.select().from(childrenTable).where(eq(childrenTable.id, req.session.childId)).limit(1);
     if (!child) { res.status(404).json({ error: "아이를 찾을 수 없어요." }); return; }
+    // 전체 대상 미션 OR 이 아이에게 배정된 미션만 노출
     const missions = await db
       .select()
       .from(missionsTable)
-      .where(and(eq(missionsTable.parentId, child.parentId), eq(missionsTable.isActive, true)))
+      .where(
+        and(
+          eq(missionsTable.parentId, child.parentId),
+          eq(missionsTable.isActive, true),
+          or(
+            eq(missionsTable.assignToAll, true),
+            exists(
+              db
+                .select({ one: sql`1` })
+                .from(missionAssignmentsTable)
+                .where(
+                  and(
+                    eq(missionAssignmentsTable.missionId, missionsTable.id),
+                    eq(missionAssignmentsTable.childId, child.id),
+                  ),
+                ),
+            ),
+          ),
+        ),
+      )
       .orderBy(desc(missionsTable.createdAt));
     res.json(missions);
     return;
@@ -79,27 +127,92 @@ router.get("/missions", async (req, res) => {
   res.status(401).json({ error: "로그인이 필요해요." });
 });
 
+// childIds가 모두 이 부모의 아이인지 검증. 통과하면 중복 제거된 id 배열, 아니면 null.
+async function resolveOwnedChildIds(parentId: number, childIds: number[]): Promise<number[] | null> {
+  const uniqueIds = [...new Set(childIds)];
+  if (uniqueIds.length === 0) return null;
+  const owned = await db
+    .select({ id: childrenTable.id })
+    .from(childrenTable)
+    .where(and(eq(childrenTable.parentId, parentId), inArray(childrenTable.id, uniqueIds)));
+  return owned.length === uniqueIds.length ? uniqueIds : null;
+}
+
 // POST /api/missions
 router.post("/missions", requireParent, async (req, res) => {
   const parsed = CreateMissionBody.safeParse(req.body);
-  if (!parsed.success) { res.status(400).json({ error: "입력값을 확인해주세요." }); return; }
-  const [mission] = await db
-    .insert(missionsTable)
-    .values({ parentId: req.session.parentId!, ...parsed.data })
-    .returning();
-  res.status(201).json(mission);
+  if (!parsed.success) { res.status(400).json({ error: parsed.error.issues[0]?.message ?? "입력값을 확인해주세요." }); return; }
+  const parentId = req.session.parentId!;
+  const { childIds, assignToAll, ...missionData } = parsed.data;
+
+  // 특정 아이 지정 시 소유 검증 (cross-parent IDOR 방지)
+  let validChildIds: number[] = [];
+  if (!assignToAll) {
+    const resolved = await resolveOwnedChildIds(parentId, childIds ?? []);
+    if (!resolved) { res.status(400).json({ error: "대상 아이가 올바르지 않아요." }); return; }
+    validChildIds = resolved;
+  }
+
+  const mission = await db.transaction(async (tx) => {
+    const [m] = await tx
+      .insert(missionsTable)
+      .values({ parentId, assignToAll, ...missionData })
+      .returning();
+    if (!assignToAll && validChildIds.length > 0) {
+      await tx.insert(missionAssignmentsTable).values(validChildIds.map((childId) => ({ missionId: m.id, childId })));
+    }
+    return m;
+  });
+  res.status(201).json({ ...mission, assignedChildIds: assignToAll ? [] : validChildIds });
 });
 
 // PATCH /api/missions/:id
 router.patch("/missions/:id", requireParent, async (req, res) => {
   const id = parseInt(req.params.id, 10);
+  const parentId = req.session.parentId!;
   const [existing] = await db.select().from(missionsTable)
-    .where(and(eq(missionsTable.id, id), eq(missionsTable.parentId, req.session.parentId!))).limit(1);
+    .where(and(eq(missionsTable.id, id), eq(missionsTable.parentId, parentId))).limit(1);
   if (!existing) { res.status(404).json({ error: "미션을 찾을 수 없어요." }); return; }
   const parsed = UpdateMissionBody.safeParse(req.body);
   if (!parsed.success) { res.status(400).json({ error: parsed.error.issues[0]?.message ?? "입력값을 확인해주세요." }); return; }
-  const [updated] = await db.update(missionsTable).set(parsed.data).where(eq(missionsTable.id, id)).returning();
-  res.json(updated);
+  const { childIds, assignToAll, ...missionData } = parsed.data;
+
+  // 대상을 특정 아이로 바꾸는 경우 소유 검증
+  let validChildIds: number[] = [];
+  if (assignToAll === false) {
+    const resolved = await resolveOwnedChildIds(parentId, childIds ?? []);
+    if (!resolved) { res.status(400).json({ error: "대상 아이가 올바르지 않아요." }); return; }
+    validChildIds = resolved;
+  }
+
+  const updated = await db.transaction(async (tx) => {
+    const setData: Record<string, unknown> = { ...missionData };
+    if (assignToAll !== undefined) setData.assignToAll = assignToAll;
+    let row = existing;
+    if (Object.keys(setData).length > 0) {
+      [row] = await tx.update(missionsTable).set(setData).where(eq(missionsTable.id, id)).returning();
+    }
+    // assignToAll이 명시된 경우에만 assignments 재설정 (불변식: assignToAll=true ⟹ assignments 없음)
+    if (assignToAll === true) {
+      await tx.delete(missionAssignmentsTable).where(eq(missionAssignmentsTable.missionId, id));
+    } else if (assignToAll === false) {
+      await tx.delete(missionAssignmentsTable).where(eq(missionAssignmentsTable.missionId, id));
+      if (validChildIds.length > 0) {
+        await tx.insert(missionAssignmentsTable).values(validChildIds.map((childId) => ({ missionId: id, childId })));
+      }
+    }
+    return row;
+  });
+
+  const assignedChildIds = updated.assignToAll
+    ? []
+    : (
+        await db
+          .select({ childId: missionAssignmentsTable.childId })
+          .from(missionAssignmentsTable)
+          .where(eq(missionAssignmentsTable.missionId, id))
+      ).map((a) => a.childId);
+  res.json({ ...updated, assignedChildIds });
 });
 
 // DELETE /api/missions/:id
@@ -122,6 +235,16 @@ router.post("/missions/:id/submit", requireChild, async (req, res) => {
 
   const [child] = await db.select().from(childrenTable).where(eq(childrenTable.id, childId)).limit(1);
   if (!child || child.parentId !== mission.parentId) { res.status(403).json({ error: "권한이 없어요." }); return; }
+
+  // 대상 검증: 전체 대상이 아니면 이 아이에게 배정된 미션만 제출 가능 (bible/activity 공통)
+  if (!mission.assignToAll) {
+    const [assigned] = await db
+      .select({ id: missionAssignmentsTable.id })
+      .from(missionAssignmentsTable)
+      .where(and(eq(missionAssignmentsTable.missionId, missionId), eq(missionAssignmentsTable.childId, childId)))
+      .limit(1);
+    if (!assigned) { res.status(403).json({ error: "이 미션의 대상이 아니에요." }); return; }
+  }
 
   // Activity type → pending parent approval (스케줄·마감·인증샷 검증)
   if (mission.type === "activity") {

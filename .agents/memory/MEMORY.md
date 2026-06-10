@@ -4,3 +4,4 @@
 - [bible-pay Stripe Checkout new tab](bible-pay-stripe-checkout-newtab.md) — top-up opens Stripe in a new tab (iframe blocks it); sync open before await for popup blocker; BroadcastChannel syncs balance cross-tab.
 - [bible-pay splash vs screenshot](bible-pay-splash-screenshot.md) — app_preview almost always catches the intentional 1.3s SplashScreen (logo only); not a hang — confirm render via console/curl.
 - [bible-pay 레거시 잔액 스케일](bible-pay-legacy-balance-scale.md) — 원→포인트(×10) 전환 후 기존 잔액/보상/주문가는 자동 재평가 안 됨; 운영 데이터 전에 ×10 마이그레이션 결정 필수.
+- [drizzle push TTY 막힘](drizzle-push-tty.md) — push가 인터랙티브 프롬프트로 막히면(--force·yes/script 무용) drizzle 네이밍 규칙에 맞춰 executeSql로 DDL 직접 적용.
