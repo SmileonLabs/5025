@@ -40,8 +40,12 @@ export function ParentTopupModal({ open, onClose }: ParentTopupModalProps) {
   const handleConfirm = async () => {
     setLoading(true);
     try {
-      // Redirects the browser to the secure Stripe Checkout page.
+      // Opens the secure Stripe Checkout page in a new tab (Stripe can't render
+      // inside an iframe). Once it's open, close the sheet and guide the parent;
+      // the budget updates automatically when the payment tab completes.
       await startTopupCheckout(numAmount);
+      toast({ title: "새 탭에서 결제를 완료해주세요." });
+      handleClose();
     } catch (err: any) {
       toast({ title: err.message ?? "결제 페이지를 여는 데 실패했어요.", variant: "destructive" });
       setLoading(false);
@@ -178,7 +182,7 @@ export function ParentTopupModal({ open, onClose }: ParentTopupModalProps) {
                     </div>
 
                     <p className="text-xs text-gray-400 text-center mb-4 leading-relaxed">
-                      안전한 Stripe 결제 페이지로 이동해요.<br />
+                      새 탭에서 안전한 Stripe 결제 페이지가 열려요.<br />
                       지금은 테스트 모드라 실제 결제는 일어나지 않아요.<br />
                       카드번호 <span className="font-bold text-gray-500">4242 4242 4242 4242</span>로 결제해보세요.
                     </p>

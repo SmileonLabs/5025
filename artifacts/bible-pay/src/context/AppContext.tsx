@@ -314,8 +314,21 @@ export function AppProvider({ children: reactChildren }: { children: ReactNode }
   };
 
   const startTopupCheckout = useCallback(async (amount: number) => {
-    const { url } = await api.post<{ url: string }>("/topups/checkout-session", { amount });
-    window.location.href = url;
+    // Stripe Checkout refuses to render inside an iframe (X-Frame-Options), and
+    // the app often runs embedded (e.g. the Replit canvas), so open Checkout in a
+    // separate tab. Open the blank tab synchronously inside the click gesture so
+    // the popup blocker doesn't kill it; only then fetch the session URL.
+    const checkoutTab = window.open("about:blank", "_blank");
+    if (!checkoutTab) {
+      throw new Error("팝업이 차단됐어요. 팝업을 허용한 뒤 다시 시도해주세요.");
+    }
+    try {
+      const { url } = await api.post<{ url: string }>("/topups/checkout-session", { amount });
+      checkoutTab.location.href = url;
+    } catch (err) {
+      checkoutTab.close();
+      throw err;
+    }
   }, []);
 
   const confirmTopup = useCallback(async (sessionId: string) => {
@@ -339,6 +352,29 @@ export function AppProvider({ children: reactChildren }: { children: ReactNode }
   // ?topup=success&session_id=... (or ?topup=cancel), so confirm here once the
   // parent session is restored, then clean the URL.
   const topupHandledRef = useRef(false);
+
+  // Cross-tab budget sync: Stripe Checkout completes in a separate tab, so when
+  // that tab credits the top-up it broadcasts the new balance and any other open
+  // tab (e.g. the embedded app) updates without a manual refresh.
+  const topupChannelRef = useRef<BroadcastChannel | null>(null);
+  useEffect(() => {
+    if (typeof BroadcastChannel === "undefined") return;
+    const channel = new BroadcastChannel("bible-pay-topup");
+    topupChannelRef.current = channel;
+    channel.onmessage = (e: MessageEvent) => {
+      const data = e.data as { type?: string; balance?: number; amount?: number };
+      if (data?.type === "topup-success" && typeof data.balance === "number") {
+        const newBalance = data.balance;
+        setParent(prev => (prev ? { ...prev, balance: newBalance } : prev));
+        toast({ title: `충전 완료! +₩${Number(data.amount ?? 0).toLocaleString("ko-KR")}` });
+      }
+    };
+    return () => {
+      channel.close();
+      topupChannelRef.current = null;
+    };
+  }, []);
+
   useEffect(() => {
     if (loading || topupHandledRef.current) return;
 
@@ -369,10 +405,23 @@ export function AppProvider({ children: reactChildren }: { children: ReactNode }
           cleanUrl();
           if (result.credited) {
             toast({ title: `충전 완료! +₩${result.amount.toLocaleString("ko-KR")}` });
+            topupChannelRef.current?.postMessage({
+              type: "topup-success",
+              balance: result.balance,
+              amount: result.amount,
+            });
           } else if (result.status && result.status !== "paid") {
             toast({ title: "결제가 아직 완료되지 않았어요.", variant: "destructive" });
           } else {
+            // Already credited (e.g. the webhook won the race). The balance in the
+            // response is still authoritative, so broadcast it too — otherwise an
+            // embedded tab would stay stale until a manual refresh.
             toast({ title: "이미 처리된 결제예요." });
+            topupChannelRef.current?.postMessage({
+              type: "topup-success",
+              balance: result.balance,
+              amount: result.amount,
+            });
           }
         } catch (err) {
           topupHandledRef.current = false;
