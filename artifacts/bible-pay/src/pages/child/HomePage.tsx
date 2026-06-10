@@ -51,9 +51,12 @@ export default function HomePage() {
 
   return (
     <div className="min-h-[100dvh] bg-gray-50 pb-24">
-      <div className="bg-white px-6 pt-12 pb-4 sticky top-0 z-40 shadow-[0_4px_24px_rgba(0,0,0,0.02)]">
-        <div className="flex justify-center mb-3">
-          <img src={`${import.meta.env.BASE_URL}logo.png`} alt="5025" className="h-9 w-auto" />
+      <div
+        className="bg-white px-6 pb-4 sticky top-0 z-40 shadow-[0_4px_24px_rgba(0,0,0,0.02)]"
+        style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 0.5rem)" }}
+      >
+        <div className="flex justify-center mb-2">
+          <img src={`${import.meta.env.BASE_URL}logo.png`} alt="5025" className="h-11 w-auto" />
         </div>
         <div className="flex justify-between items-center">
           <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2">
