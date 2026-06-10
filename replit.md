@@ -26,7 +26,11 @@ _Populate as you build — short repo map plus pointers to the source-of-truth f
 
 ## Architecture decisions
 
-_Populate as you build — non-obvious choices a reader couldn't infer from the code (3-5 bullets)._
+- 기프티콘 주문 상태머신: `requested → fulfilled`(운영자 수동 발급), `requested → rejected`(운영자, 환불), `requested → canceled`(아이, 환불). 부모 승인 단계 없음.
+- `fulfilled`는 종결 상태로, 운영자가 핀/바코드를 발급한 뒤에는 환불·되돌리기 경로가 없음(수동 발급 MVP의 의도된 한계). 잘못 발급 시 별도 보상은 수동 처리.
+- 기프티콘 가격은 서버 권위. 클라이언트는 `catalogItemId`만 전송하고, 가격은 `gifticonCatalog.ts` 상수에서 읽어 주문 행에 스냅샷(가격 변조 차단).
+- 잔액 차감/환불은 조건부 `UPDATE ... WHERE balance >= price`(차감)와 `WHERE status = 'requested'`(환불/발급)로 원자적 처리 — TOCTOU·이중환불 방지.
+- 발급 비밀값(핀/바코드/이미지URL)은 목록 응답에서 제외, 상세 엔드포인트(소유 아이/부모/운영자 인가)에서만 노출.
 
 ## Product
 

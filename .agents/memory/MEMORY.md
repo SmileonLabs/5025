@@ -2,3 +2,4 @@
 - [stripe-replit-sync managed webhooks](stripe-replit-sync-webhooks.md) — managed webhook secret isn't in connection settings; processWebhook returns void; credit via redirect-confirm, not webhook.
 - [bible-pay PWA dev cache](bible-pay-pwa-dev-cache.md) — dev SW is OFF (devOptions:false) after it caused blank-screen hangs; main.tsx self-heals stale SWs; for "didn't change" suspect installed-PWA / un-republished prod.
 - [bible-pay Stripe Checkout new tab](bible-pay-stripe-checkout-newtab.md) — top-up opens Stripe in a new tab (iframe blocks it); sync open before await for popup blocker; BroadcastChannel syncs balance cross-tab.
+- [bible-pay splash vs screenshot](bible-pay-splash-screenshot.md) — app_preview almost always catches the intentional 1.3s SplashScreen (logo only); not a hang — confirm render via console/curl.

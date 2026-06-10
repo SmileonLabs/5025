@@ -1,8 +1,21 @@
 import { Router, type IRouter } from "express";
+import { timingSafeEqual } from "node:crypto";
 import { z } from "zod/v4";
 import { getAdminPassword, requireAdmin } from "../lib/adminAuth";
 
 const router: IRouter = Router();
+
+/** Constant-time password comparison that does not leak length via early exit. */
+function passwordMatches(input: string, expected: string): boolean {
+  const a = Buffer.from(input);
+  const b = Buffer.from(expected);
+  if (a.length !== b.length) {
+    // Still run a comparison against a same-length buffer to keep timing flat.
+    timingSafeEqual(b, b);
+    return false;
+  }
+  return timingSafeEqual(a, b);
+}
 
 // POST /api/admin/login — exchange the operator password for an admin session
 router.post("/admin/login", (req, res) => {
@@ -18,15 +31,23 @@ router.post("/admin/login", (req, res) => {
     return;
   }
 
-  if (parsed.data.password !== adminPw) {
+  if (!passwordMatches(parsed.data.password, adminPw)) {
     res.status(401).json({ error: "비밀번호가 맞지 않아요." });
     return;
   }
 
-  req.session.isAdmin = true;
-  req.session.parentId = undefined;
-  req.session.childId = undefined;
-  res.json({ ok: true });
+  // Regenerate the session id on privilege elevation to thwart session fixation.
+  req.session.regenerate((err) => {
+    if (err) {
+      req.log.error({ err }, "Admin session regeneration failed.");
+      res.status(500).json({ error: "로그인 중 문제가 발생했어요." });
+      return;
+    }
+    req.session.isAdmin = true;
+    req.session.parentId = undefined;
+    req.session.childId = undefined;
+    res.json({ ok: true });
+  });
 });
 
 // POST /api/admin/logout
