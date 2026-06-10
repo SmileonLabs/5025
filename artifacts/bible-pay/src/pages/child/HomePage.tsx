@@ -51,16 +51,21 @@ export default function HomePage() {
 
   return (
     <div className="min-h-[100dvh] bg-gray-50 pb-24">
-      <div className="bg-white px-6 pt-12 pb-4 flex justify-between items-center sticky top-0 z-40 shadow-[0_4px_24px_rgba(0,0,0,0.02)]">
-        <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-          안녕, {currentChild.name}! <span className="text-2xl">{currentChild.avatar}</span>
-        </h1>
-        <button onClick={openNotifications} className="p-2 text-gray-500 bg-gray-50 rounded-full relative" data-testid="btn-notifications">
-          <Bell className="w-6 h-6" />
-          {hasUnread && (
-            <span className="absolute top-2 right-2 w-2 h-2 bg-red-400 rounded-full border-2 border-white" />
-          )}
-        </button>
+      <div className="bg-white px-6 pt-12 pb-4 sticky top-0 z-40 shadow-[0_4px_24px_rgba(0,0,0,0.02)]">
+        <div className="flex justify-center mb-3">
+          <img src={`${import.meta.env.BASE_URL}logo.png`} alt="5025" className="h-9 w-auto" />
+        </div>
+        <div className="flex justify-between items-center">
+          <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+            안녕, {currentChild.name}! <span className="text-2xl">{currentChild.avatar}</span>
+          </h1>
+          <button onClick={openNotifications} className="p-2 text-gray-500 bg-gray-50 rounded-full relative" data-testid="btn-notifications">
+            <Bell className="w-6 h-6" />
+            {hasUnread && (
+              <span className="absolute top-2 right-2 w-2 h-2 bg-red-400 rounded-full border-2 border-white" />
+            )}
+          </button>
+        </div>
       </div>
 
       <div className="px-6 pt-6 space-y-6">

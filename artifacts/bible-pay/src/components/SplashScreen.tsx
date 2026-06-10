@@ -22,7 +22,7 @@ export function SplashScreen() {
         initial={{ scale: 1, opacity: 1 }}
         animate={{ scale: [1, 1.04, 1] }}
         transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
-        className="w-52 max-w-[70%] drop-shadow-sm"
+        className="w-52 max-w-[70%]"
       />
     </motion.div>
   );
