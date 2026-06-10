@@ -1,4 +1,4 @@
-import { pgTable, serial, text, integer, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, integer, boolean, timestamp } from "drizzle-orm/pg-core";
 import { parentsTable } from "./parents";
 
 /**
@@ -15,7 +15,8 @@ export const gifticonCatalogItemsTable = pgTable("gifticon_catalog_items", {
     .references(() => parentsTable.id, { onDelete: "cascade" }),
   brand: text("brand").notNull(),
   productName: text("product_name").notNull(),
-  price: integer("price").notNull(), // points deducted from the child's balance
+  price: integer("price").notNull(), // 고정가 상품의 차감 포인트. 자유금액(금액권) 상품이면 0.
+  isVariablePrice: boolean("is_variable_price").notNull().default(false), // true면 아이가 주문 시 금액 직접 입력(잔액까지)
   emoji: text("emoji").notNull().default("🎁"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });

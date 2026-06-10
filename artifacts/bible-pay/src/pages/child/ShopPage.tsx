@@ -48,11 +48,11 @@ export default function ShopPage() {
   const balance = currentChild.balance;
   const pendingCount = gifticonOrders.filter((o) => o.status === "requested").length;
 
-  const confirmBuy = async () => {
+  const confirmBuy = async (amount?: number) => {
     if (!selected) return;
     setBuying(true);
     try {
-      await buyGifticon(String(selected.id));
+      await buyGifticon(String(selected.id), selected.isVariablePrice ? amount : undefined);
       toast({ title: "구매 완료! 부모님이 확인 후 보내주실 거예요 🎁" });
       setSelected(null);
       setTab("mine");
@@ -137,7 +137,7 @@ export default function ShopPage() {
         <div className="px-6 pt-4">
           <div className="grid grid-cols-2 gap-3">
             {gifticonCatalog.map((item, i) => {
-              const affordable = balance >= item.price;
+              const affordable = item.isVariablePrice ? balance >= 1 : balance >= item.price;
               return (
                 <motion.button
                   key={item.id}
@@ -158,7 +158,7 @@ export default function ShopPage() {
                   </div>
                   <div className="mt-auto pt-1">
                     <p className="text-base font-black text-gray-900">
-                      {item.price.toLocaleString("ko-KR")}P
+                      {item.isVariablePrice ? "금액 자유" : `${item.price.toLocaleString("ko-KR")}P`}
                     </p>
                     {!affordable && (
                       <p className="text-[11px] text-red-400 font-bold mt-0.5">잔액이 부족해요</p>
@@ -303,10 +303,16 @@ function BuyConfirmSheet({
   balance: number;
   busy: boolean;
   onClose: () => void;
-  onConfirm: () => void;
+  onConfirm: (amount?: number) => void;
 }) {
-  const affordable = balance >= item.price;
-  const after = balance - item.price;
+  const isVar = item.isVariablePrice;
+  const [amountStr, setAmountStr] = useState("");
+  const parsedAmount = parseInt(amountStr.replace(/,/g, ""), 10);
+  const effPrice = isVar ? (isNaN(parsedAmount) ? 0 : parsedAmount) : item.price;
+  const affordable = effPrice >= 1 && balance >= effPrice;
+  const after = balance - effPrice;
+  const disabledMsg = isVar && effPrice < 1 ? "금액을 입력해주세요" : "잔액이 부족해요";
+
   return (
     <>
       <motion.div
@@ -336,7 +342,36 @@ function BuyConfirmSheet({
           </div>
           <p className="text-sm text-gray-400 font-bold">{item.brand}</p>
           <p className="text-lg font-bold text-gray-900">{item.productName}</p>
-          <p className="text-2xl font-black text-gray-900 mt-2">{item.price.toLocaleString("ko-KR")}P</p>
+          {isVar ? (
+            <div className="w-full mt-3">
+              <p className="text-xs text-gray-400 font-bold mb-1.5">얼마나 쓸까요?</p>
+              <div className="relative">
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  autoFocus
+                  value={amountStr}
+                  onChange={(e) => {
+                    const v = e.target.value.replace(/[^0-9]/g, "");
+                    setAmountStr(v ? parseInt(v, 10).toLocaleString("ko-KR") : "");
+                  }}
+                  placeholder="0"
+                  className="w-full text-center text-2xl font-black text-gray-900 border-2 border-gray-200 rounded-[16px] py-3 pr-10 focus:outline-none focus:border-primary"
+                  data-testid="input-buy-amount"
+                />
+                <span className="absolute right-5 top-1/2 -translate-y-1/2 text-lg font-black text-gray-400">P</span>
+              </div>
+              <button
+                onClick={() => setAmountStr(balance.toLocaleString("ko-KR"))}
+                className="mt-2 text-xs font-bold text-primary-foreground"
+                data-testid="btn-buy-amount-max"
+              >
+                잔액 전부 쓰기 ({balance.toLocaleString("ko-KR")}P)
+              </button>
+            </div>
+          ) : (
+            <p className="text-2xl font-black text-gray-900 mt-2">{item.price.toLocaleString("ko-KR")}P</p>
+          )}
         </div>
 
         <div className="bg-gray-50 rounded-[16px] p-4 mt-3 space-y-2">
@@ -354,17 +389,17 @@ function BuyConfirmSheet({
 
         {affordable ? (
           <button
-            onClick={onConfirm}
+            onClick={() => onConfirm(isVar ? effPrice : undefined)}
             disabled={busy}
             className="mt-5 w-full h-[52px] bg-gradient-to-r from-primary to-accent text-white rounded-[16px] font-bold text-base flex items-center justify-center gap-2 shadow-md disabled:opacity-60"
             data-testid="btn-confirm-buy"
           >
             {busy ? <Loader2 className="w-5 h-5 animate-spin" /> : null}
-            {item.price.toLocaleString("ko-KR")}P에 구매하기
+            {effPrice.toLocaleString("ko-KR")}P에 구매하기
           </button>
         ) : (
           <div className="mt-5 w-full h-[52px] bg-gray-100 text-gray-400 rounded-[16px] font-bold text-base flex items-center justify-center">
-            잔액이 부족해요
+            {disabledMsg}
           </div>
         )}
         <p className="text-center text-xs text-gray-400 mt-3 leading-relaxed">

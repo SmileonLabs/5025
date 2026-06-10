@@ -53,12 +53,19 @@ router.get("/gifticons/catalog", async (req, res) => {
   res.json(items);
 });
 
-const CatalogItemBody = z.object({
-  brand: z.string().trim().min(1).max(100),
-  productName: z.string().trim().min(1).max(100),
-  price: z.number().int().min(1).max(10_000_000),
-  emoji: z.string().trim().min(1).max(20).optional(),
-});
+const CatalogItemBody = z
+  .object({
+    brand: z.string().trim().min(1).max(100),
+    productName: z.string().trim().min(1).max(100),
+    // 고정상품은 price>=1; 자유금액(금액권) 상품은 price 무시(0 저장).
+    price: z.number().int().min(0).max(10_000_000),
+    isVariablePrice: z.boolean().optional().default(false),
+    emoji: z.string().trim().min(1).max(20).optional(),
+  })
+  .refine((v) => v.isVariablePrice || v.price >= 1, {
+    message: "가격을 입력해주세요.",
+    path: ["price"],
+  });
 
 // POST /api/gifticons/catalog — parent registers a new shop item
 router.post("/gifticons/catalog", async (req, res) => {
@@ -71,14 +78,15 @@ router.post("/gifticons/catalog", async (req, res) => {
     res.status(400).json({ error: parsed.error.issues[0]?.message ?? "입력값을 확인해주세요." });
     return;
   }
-  const { brand, productName, price, emoji } = parsed.data;
+  const { brand, productName, price, isVariablePrice, emoji } = parsed.data;
   const [item] = await db
     .insert(gifticonCatalogItemsTable)
     .values({
       parentId: req.session.parentId,
       brand,
       productName,
-      price,
+      price: isVariablePrice ? 0 : price,
+      isVariablePrice,
       ...(emoji ? { emoji } : {}),
     })
     .returning();
@@ -120,7 +128,12 @@ router.post("/gifticons/orders", async (req, res) => {
     res.status(401).json({ error: "아이 로그인이 필요해요." });
     return;
   }
-  const parsed = z.object({ catalogItemId: z.string().min(1) }).safeParse(req.body);
+  const parsed = z
+    .object({
+      catalogItemId: z.string().min(1),
+      amount: z.number().int().min(1).max(10_000_000).optional(),
+    })
+    .safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "상품을 선택해주세요." });
     return;
@@ -158,6 +171,21 @@ router.post("/gifticons/orders", async (req, res) => {
     return;
   }
 
+  // Price authority: fixed-price items always use the DB price (client `amount`
+  // is ignored). Variable-price (금액권) items require the child to send an
+  // integer amount > 0; the balance ceiling is enforced atomically by
+  // createGifticonOrder's conditional `WHERE balance >= price` UPDATE.
+  let faceValue: number;
+  if (dbItem.isVariablePrice) {
+    if (parsed.data.amount === undefined) {
+      res.status(400).json({ error: "금액을 입력해주세요." });
+      return;
+    }
+    faceValue = parsed.data.amount;
+  } else {
+    faceValue = dbItem.price;
+  }
+
   const result = await createGifticonOrder({
     childId: child.id,
     parentId: child.parentId,
@@ -165,8 +193,8 @@ router.post("/gifticons/orders", async (req, res) => {
       id: String(dbItem.id),
       brand: dbItem.brand,
       productName: dbItem.productName,
-      faceValue: dbItem.price,
-      price: dbItem.price,
+      faceValue,
+      price: faceValue,
       emoji: dbItem.emoji,
     },
   });

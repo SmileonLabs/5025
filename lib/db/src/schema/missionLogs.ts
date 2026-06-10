@@ -10,6 +10,7 @@ export const missionLogsTable = pgTable("mission_logs", {
   bibleBook: text("bible_book"),
   bibleChapter: integer("bible_chapter"),
   reflection: text("reflection"),
+  photoUrl: text("photo_url"), // activity 인증샷 objectPath ("/objects/...")
   transactionId: integer("transaction_id"),
   requestedAt: timestamp("requested_at", { withTimezone: true }).notNull().defaultNow(),
   approvedAt: timestamp("approved_at", { withTimezone: true }),

@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { useLocation } from "wouter";
 import { motion } from "framer-motion";
-import { ChevronLeft, Plus, Trash2, Loader2, Check, X } from "lucide-react";
+import { ChevronLeft, Plus, Trash2, Loader2, Check, X, ToggleLeft, ToggleRight } from "lucide-react";
 import {
   useAppContext,
   GifticonOrder,
@@ -239,24 +239,33 @@ function PastCard({ order }: { order: GifticonOrder }) {
   );
 }
 
+const EMOJI_PALETTE = [
+  "🎁", "🎀", "🍫", "🍪", "🍩", "🍰", "🎂", "🧁", "🍦", "🍿",
+  "🥤", "☕", "🧋", "🍔", "🍕", "🍗", "🍟", "🌭", "🥪", "🍙",
+  "🍜", "🎮", "🕹️", "📚", "✏️", "🎨", "🧸", "🪀", "⚽", "🏀",
+  "🎫", "🎬", "🎵", "💎", "👟", "🧢", "💄", "🌸", "🚲", "🛹",
+];
+
 function CatalogTab({
   catalog,
   onCreate,
   onDelete,
 }: {
   catalog: GifticonCatalogItem[];
-  onCreate: (data: { brand: string; productName: string; price: number; emoji?: string }) => Promise<void>;
+  onCreate: (data: { brand: string; productName: string; price: number; isVariablePrice?: boolean; emoji?: string }) => Promise<void>;
   onDelete: (id: number) => Promise<void>;
 }) {
   const [brand, setBrand] = useState("");
   const [productName, setProductName] = useState("");
   const [price, setPrice] = useState("");
-  const [emoji, setEmoji] = useState("");
+  const [emoji, setEmoji] = useState("🎁");
+  const [isVariablePrice, setIsVariablePrice] = useState(false);
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<number | null>(null);
 
   const numPrice = parseInt(price.replace(/,/g, ""), 10);
-  const valid = brand.trim() !== "" && productName.trim() !== "" && !isNaN(numPrice) && numPrice > 0;
+  const priceValid = isVariablePrice || (!isNaN(numPrice) && numPrice > 0);
+  const valid = brand.trim() !== "" && productName.trim() !== "" && priceValid;
 
   const handleCreate = async () => {
     if (!valid) return;
@@ -265,14 +274,16 @@ function CatalogTab({
       await onCreate({
         brand: brand.trim(),
         productName: productName.trim(),
-        price: numPrice,
-        emoji: emoji.trim() || undefined,
+        price: isVariablePrice ? 0 : numPrice,
+        isVariablePrice,
+        emoji: emoji || undefined,
       });
       toast({ title: "상품을 등록했어요 🎁" });
       setBrand("");
       setProductName("");
       setPrice("");
-      setEmoji("");
+      setEmoji("🎁");
+      setIsVariablePrice(false);
     } catch (err) {
       toast({ title: err instanceof Error ? err.message : "등록에 실패했어요.", variant: "destructive" });
     } finally {
@@ -296,23 +307,32 @@ function CatalogTab({
     <div className="px-6 pt-4 space-y-5">
       <div className="bg-white rounded-[20px] p-5 shadow-sm border border-gray-100 space-y-3">
         <p className="text-sm font-bold text-gray-700">새 상품 등록</p>
-        <div className="flex gap-2">
-          <Input
-            value={emoji}
-            onChange={(e) => setEmoji(e.target.value)}
-            placeholder="🎁"
-            maxLength={4}
-            className="w-16 text-center text-xl rounded-[14px] border-gray-200"
-            data-testid="input-emoji"
-          />
-          <Input
-            value={brand}
-            onChange={(e) => setBrand(e.target.value)}
-            placeholder="브랜드 (예: 스타벅스)"
-            className="flex-1 rounded-[14px] border-gray-200"
-            data-testid="input-brand"
-          />
+
+        <div>
+          <p className="text-xs font-bold text-gray-500 mb-2">아이콘 선택</p>
+          <div className="grid grid-cols-8 gap-1.5">
+            {EMOJI_PALETTE.map((e) => (
+              <button
+                key={e}
+                onClick={() => setEmoji(e)}
+                className={`aspect-square rounded-[12px] flex items-center justify-center text-xl transition-all ${
+                  emoji === e ? "bg-primary/10 ring-2 ring-primary" : "bg-gray-50 hover:bg-gray-100"
+                }`}
+                data-testid={`emoji-${e}`}
+              >
+                {e}
+              </button>
+            ))}
+          </div>
         </div>
+
+        <Input
+          value={brand}
+          onChange={(e) => setBrand(e.target.value)}
+          placeholder="브랜드 (예: 스타벅스)"
+          className="rounded-[14px] border-gray-200"
+          data-testid="input-brand"
+        />
         <Input
           value={productName}
           onChange={(e) => setProductName(e.target.value)}
@@ -320,20 +340,40 @@ function CatalogTab({
           className="rounded-[14px] border-gray-200"
           data-testid="input-product"
         />
-        <div className="relative">
-          <Input
-            value={price}
-            onChange={(e) => {
-              const v = e.target.value.replace(/[^0-9]/g, "");
-              setPrice(v ? parseInt(v, 10).toLocaleString("ko-KR") : "");
-            }}
-            placeholder="0"
-            inputMode="numeric"
-            className="text-right pr-10 rounded-[14px] border-gray-200"
-            data-testid="input-price"
-          />
-          <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm font-bold text-gray-400">P</span>
-        </div>
+
+        <button
+          onClick={() => setIsVariablePrice((v) => !v)}
+          className="w-full flex items-center justify-between bg-gray-50 rounded-[14px] px-4 py-3 border border-gray-200"
+          data-testid="toggle-variable-price"
+        >
+          <span className="text-left">
+            <span className="text-sm font-bold text-gray-700 block">금액권 (자유 금액)</span>
+            <span className="text-[11px] text-gray-400">아이가 살 때 직접 금액을 정해요</span>
+          </span>
+          {isVariablePrice ? (
+            <ToggleRight className="w-7 h-7 text-primary flex-shrink-0" />
+          ) : (
+            <ToggleLeft className="w-7 h-7 text-gray-300 flex-shrink-0" />
+          )}
+        </button>
+
+        {!isVariablePrice && (
+          <div className="relative">
+            <Input
+              value={price}
+              onChange={(e) => {
+                const v = e.target.value.replace(/[^0-9]/g, "");
+                setPrice(v ? parseInt(v, 10).toLocaleString("ko-KR") : "");
+              }}
+              placeholder="0"
+              inputMode="numeric"
+              className="text-right pr-10 rounded-[14px] border-gray-200"
+              data-testid="input-price"
+            />
+            <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm font-bold text-gray-400">P</span>
+          </div>
+        )}
+
         <Button
           onClick={handleCreate}
           disabled={!valid || saving}
@@ -361,7 +401,7 @@ function CatalogTab({
                 <p className="text-[11px] text-gray-400 font-bold">{item.brand}</p>
                 <p className="text-sm font-bold text-gray-900 truncate">{item.productName}</p>
               </div>
-              <p className="text-sm font-black text-gray-900">{formatPoints(item.price)}</p>
+              <p className="text-sm font-black text-gray-900">{item.isVariablePrice ? "금액 자유" : formatPoints(item.price)}</p>
               <button
                 onClick={() => handleDelete(item.id)}
                 disabled={deletingId === item.id}

@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { z } from "zod";
 import { db, missionsTable, missionLogsTable, childrenTable, transactionsTable } from "@workspace/db";
-import { eq, and, desc, inArray } from "drizzle-orm";
+import { eq, and, desc, inArray, sql } from "drizzle-orm";
 import { sendPushToParent } from "../lib/push";
 
 const router = Router();
@@ -22,13 +22,37 @@ function requireChild(req: any, res: any, next: any) {
   next();
 }
 
-const CreateMissionBody = z.object({
+const MissionFields = z.object({
   title: z.string().min(1).max(100),
   description: z.string().max(500).default(""),
-  type: z.enum(["bible", "auto", "confirm"]),
+  // "bible" = 성경읽기(즉시 지급), "activity" = 부모 확인형 활동 미션
+  type: z.enum(["bible", "activity"]),
   reward: z.number().int().min(0).max(100000),
+  // activity 전용 (bible은 무시)
+  scheduleType: z.enum(["daily", "once"]).default("daily"),
+  scheduledDate: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "지정일 형식이 올바르지 않아요.")
+    .nullable()
+    .optional(),
+  timeLimit: z
+    .string()
+    .regex(/^([01]\d|2[0-3]):[0-5]\d$/, "시간 형식이 올바르지 않아요.")
+    .nullable()
+    .optional(),
+  requiresPhoto: z.boolean().default(false),
   isActive: z.boolean().default(true),
 });
+
+// scheduleType === "once" 이면 지정일(scheduledDate)이 반드시 있어야 한다.
+const CreateMissionBody = MissionFields.refine(
+  (v) => v.scheduleType !== "once" || !!v.scheduledDate,
+  { message: "지정일을 선택해주세요.", path: ["scheduledDate"] },
+);
+const UpdateMissionBody = MissionFields.partial().refine(
+  (v) => v.scheduleType !== "once" || v.scheduledDate != null,
+  { message: "지정일을 선택해주세요.", path: ["scheduledDate"] },
+);
 
 // GET /api/missions
 router.get("/missions", async (req, res) => {
@@ -72,8 +96,8 @@ router.patch("/missions/:id", requireParent, async (req, res) => {
   const [existing] = await db.select().from(missionsTable)
     .where(and(eq(missionsTable.id, id), eq(missionsTable.parentId, req.session.parentId!))).limit(1);
   if (!existing) { res.status(404).json({ error: "미션을 찾을 수 없어요." }); return; }
-  const parsed = CreateMissionBody.partial().safeParse(req.body);
-  if (!parsed.success) { res.status(400).json({ error: "입력값을 확인해주세요." }); return; }
+  const parsed = UpdateMissionBody.safeParse(req.body);
+  if (!parsed.success) { res.status(400).json({ error: parsed.error.issues[0]?.message ?? "입력값을 확인해주세요." }); return; }
   const [updated] = await db.update(missionsTable).set(parsed.data).where(eq(missionsTable.id, id)).returning();
   res.json(updated);
 });
@@ -99,19 +123,87 @@ router.post("/missions/:id/submit", requireChild, async (req, res) => {
   const [child] = await db.select().from(childrenTable).where(eq(childrenTable.id, childId)).limit(1);
   if (!child || child.parentId !== mission.parentId) { res.status(403).json({ error: "권한이 없어요." }); return; }
 
-  // Confirm type → pending parent approval
-  if (mission.type === "confirm") {
-    const [log] = await db.insert(missionLogsTable)
-      .values({ missionId, childId, status: "requested" }).returning();
+  // Activity type → pending parent approval (스케줄·마감·인증샷 검증)
+  if (mission.type === "activity") {
+    const actBody = z
+      .object({ photoUrl: z.string().startsWith("/objects/").max(500).optional() })
+      .safeParse(req.body);
+    const photoUrl = actBody.success ? actBody.data.photoUrl : undefined;
+
+    // 인증샷 필수 미션인데 사진이 없으면 거부
+    if (mission.requiresPhoto && !photoUrl) {
+      res.status(400).json({ error: "인증샷을 올려주세요." });
+      return;
+    }
+
+    // 마감 시각(KST) enforce — 현재 KST HH:MM이 timeLimit을 지났으면 거부
+    if (mission.timeLimit) {
+      const nowKstHHMM = new Intl.DateTimeFormat("en-GB", {
+        timeZone: "Asia/Seoul",
+        hour: "2-digit",
+        minute: "2-digit",
+        hourCycle: "h23",
+      }).format(new Date());
+      if (nowKstHHMM > mission.timeLimit) {
+        res.status(409).json({ error: `마감 시간(${mission.timeLimit})이 지났어요.` });
+        return;
+      }
+    }
+
+    // 지정일(once) enforce — 오늘(KST)이 지정일이 아니면 제출 거부
+    if (mission.scheduleType === "once" && mission.scheduledDate) {
+      const todayKst = new Intl.DateTimeFormat("en-CA", {
+        timeZone: "Asia/Seoul",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      }).format(new Date());
+      if (mission.scheduledDate !== todayKst) {
+        res.status(409).json({ error: `이 미션은 ${mission.scheduledDate}에 할 수 있어요.` });
+        return;
+      }
+    }
+
+    // 중복 방지: 미처리(requested/approved) 요청이 있으면 차단.
+    // daily는 오늘(KST) 분만, once는 기간 무관. rejected는 제외(재도전 가능).
+    const dupConds = [
+      eq(missionLogsTable.missionId, missionId),
+      eq(missionLogsTable.childId, childId),
+      inArray(missionLogsTable.status, ["requested", "approved"]),
+    ];
+    if (mission.scheduleType === "daily") {
+      dupConds.push(
+        sql`(${missionLogsTable.createdAt} AT TIME ZONE 'Asia/Seoul')::date = (now() AT TIME ZONE 'Asia/Seoul')::date`,
+      );
+    }
+    const dup = await db
+      .select({ id: missionLogsTable.id })
+      .from(missionLogsTable)
+      .where(and(...dupConds))
+      .limit(1);
+    if (dup.length > 0) {
+      res.status(409).json({
+        error:
+          mission.scheduleType === "daily"
+            ? "오늘은 이미 완료 요청했어요."
+            : "이미 완료 요청한 미션이에요.",
+      });
+      return;
+    }
+
+    const [log] = await db
+      .insert(missionLogsTable)
+      .values({ missionId, childId, status: "requested", photoUrl: photoUrl ?? null })
+      .returning();
     void sendPushToParent(child.parentId, {
       title: "📋 미션 승인 요청",
-      body: `${child.name}님이 '${mission.title}' 미션을 완료했어요. 승인하면 ${mission.reward.toLocaleString()}원이 지급돼요.`,
+      body: `${child.name}님이 '${mission.title}' 미션을 완료했어요. 승인하면 ${mission.reward.toLocaleString("ko-KR")}P가 지급돼요.`,
     });
     res.status(201).json({ log, pending: true });
     return;
   }
 
-  // Bible / auto → immediate reward
+  // Bible → immediate reward (책/장 + 묵상 검증 후 즉시 지급)
   const bodyParsed = z.object({
     bibleBook: z.string().optional(),
     bibleChapter: z.number().int().optional(),
@@ -158,7 +250,7 @@ router.post("/missions/:id/submit", requireChild, async (req, res) => {
 
   void sendPushToParent(child.parentId, {
     title: "🎉 미션 완료!",
-    body: `${child.name}님이 '${mission.title}' 미션을 완료하고 ${mission.reward.toLocaleString()}원을 받았어요.`,
+    body: `${child.name}님이 '${mission.title}' 미션을 완료하고 ${mission.reward.toLocaleString("ko-KR")}P를 받았어요.`,
   });
 
   res.status(201).json({ log, tx, childBalance: newBalance });

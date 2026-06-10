@@ -43,15 +43,35 @@ export interface ChildRequest {
   childAvatar: string;
 }
 
+export type MissionType = "bible" | "activity";
+export type MissionScheduleType = "daily" | "once";
+
 export interface Mission {
   id: number;
   parentId: number;
   title: string;
   description: string;
-  type: "bible" | "auto" | "confirm";
+  type: MissionType;
   reward: number;
+  // activity 전용 메타 (bible은 무시)
+  scheduleType: MissionScheduleType;
+  scheduledDate: string | null;
+  timeLimit: string | null;
+  requiresPhoto: boolean;
   isActive: boolean;
   createdAt: string;
+}
+
+// createMission 입력 (서버 zod 형태와 일치)
+export interface MissionInput {
+  title: string;
+  description: string;
+  type: MissionType;
+  reward: number;
+  scheduleType: MissionScheduleType;
+  scheduledDate?: string | null;
+  timeLimit?: string | null;
+  requiresPhoto: boolean;
 }
 
 export interface PendingLog {
@@ -60,6 +80,7 @@ export interface PendingLog {
   childId: number;
   status: "requested";
   requestedAt: string;
+  photoUrl: string | null;
   mission: { id: number; title: string; reward: number; type: string };
   child: { id: number; name: string; avatar: string };
 }
@@ -70,6 +91,7 @@ export interface GifticonCatalogItem {
   brand: string;
   productName: string;
   price: number;
+  isVariablePrice: boolean;
   emoji: string;
   createdAt: string;
 }
@@ -127,12 +149,12 @@ interface AppState {
   deleteChild: (childId: number) => Promise<void>;
   refreshChildren: () => Promise<void>;
   // Mission management (parent)
-  createMission: (data: { title: string; description: string; type: Mission["type"]; reward: number }) => Promise<void>;
-  updateMission: (id: number, data: Partial<Pick<Mission, "title" | "description" | "reward" | "isActive">>) => Promise<void>;
+  createMission: (data: MissionInput) => Promise<void>;
+  updateMission: (id: number, data: Partial<Pick<Mission, "title" | "description" | "reward" | "isActive" | "scheduleType" | "scheduledDate" | "timeLimit" | "requiresPhoto">>) => Promise<void>;
   deleteMission: (id: number) => Promise<void>;
   refreshMissions: () => Promise<void>;
   // Mission actions (child)
-  submitMission: (missionId: number, opts?: { bibleBook?: string; bibleChapter?: number; reflection?: string }) => Promise<{ childBalance: number }>;
+  submitMission: (missionId: number, opts?: { bibleBook?: string; bibleChapter?: number; reflection?: string; photoUrl?: string }) => Promise<{ childBalance: number }>;
   // Pending approvals (parent)
   refreshPendingLogs: () => Promise<void>;
   approveMissionLog: (logId: number) => Promise<void>;
@@ -150,11 +172,11 @@ interface AppState {
   gifticonOrders: GifticonOrder[];
   refreshGifticonCatalog: () => Promise<void>;
   refreshGifticonOrders: () => Promise<void>;
-  buyGifticon: (catalogItemId: string) => Promise<void>;
+  buyGifticon: (catalogItemId: string, amount?: number) => Promise<void>;
   cancelGifticonOrder: (orderId: number) => Promise<void>;
   getGifticonOrderDetail: (orderId: number) => Promise<GifticonOrderDetail>;
   // Gifticon catalog management (parent)
-  createGifticonCatalogItem: (data: { brand: string; productName: string; price: number; emoji?: string }) => Promise<void>;
+  createGifticonCatalogItem: (data: { brand: string; productName: string; price: number; isVariablePrice?: boolean; emoji?: string }) => Promise<void>;
   deleteGifticonCatalogItem: (id: number) => Promise<void>;
   // Gifticon fulfillment / rejection (parent)
   fulfillGifticonOrderByParent: (orderId: number, issued?: { issuedPin?: string; issuedBarcode?: string; issuedImageUrl?: string }) => Promise<void>;
@@ -346,12 +368,12 @@ export function AppProvider({ children: reactChildren }: { children: ReactNode }
     setChildren(prev => prev.filter(c => c.id !== childId));
   };
 
-  const createMission = async (data: { title: string; description: string; type: Mission["type"]; reward: number }) => {
+  const createMission = async (data: MissionInput) => {
     const mission = await api.post<Mission>("/missions", { ...data, isActive: true });
     setMissions(prev => [mission, ...prev]);
   };
 
-  const updateMission = async (id: number, data: Partial<Pick<Mission, "title" | "description" | "reward" | "isActive">>) => {
+  const updateMission = async (id: number, data: Partial<Pick<Mission, "title" | "description" | "reward" | "isActive" | "scheduleType" | "scheduledDate" | "timeLimit" | "requiresPhoto">>) => {
     const updated = await api.patch<Mission>(`/missions/${id}`, data);
     setMissions(prev => prev.map(m => m.id === id ? updated : m));
   };
@@ -361,10 +383,10 @@ export function AppProvider({ children: reactChildren }: { children: ReactNode }
     setMissions(prev => prev.filter(m => m.id !== id));
   };
 
-  const submitMission = async (missionId: number, opts?: { bibleBook?: string; bibleChapter?: number; reflection?: string }): Promise<{ childBalance: number }> => {
+  const submitMission = async (missionId: number, opts?: { bibleBook?: string; bibleChapter?: number; reflection?: string; photoUrl?: string }): Promise<{ childBalance: number }> => {
     const result = await api.post<{ childBalance: number; log: unknown; tx?: unknown; pending?: boolean }>(
       `/missions/${missionId}/submit`,
-      { bibleBook: opts?.bibleBook, bibleChapter: opts?.bibleChapter, reflection: opts?.reflection }
+      { bibleBook: opts?.bibleBook, bibleChapter: opts?.bibleChapter, reflection: opts?.reflection, photoUrl: opts?.photoUrl }
     );
     if (!result.pending && result.childBalance !== undefined) {
       setCurrentChild(prev => prev ? { ...prev, balance: result.childBalance } : prev);
@@ -540,10 +562,10 @@ export function AppProvider({ children: reactChildren }: { children: ReactNode }
     setChildRequests(prev => prev.filter(r => r.id !== id));
   };
 
-  const buyGifticon = async (catalogItemId: string) => {
+  const buyGifticon = async (catalogItemId: string, amount?: number) => {
     const result = await api.post<{ order: GifticonOrder; childBalance: number }>(
       "/gifticons/orders",
-      { catalogItemId },
+      amount === undefined ? { catalogItemId } : { catalogItemId, amount },
     );
     setCurrentChild(prev => prev ? { ...prev, balance: result.childBalance } : prev);
     const [txs, orders] = await Promise.all([
@@ -572,7 +594,7 @@ export function AppProvider({ children: reactChildren }: { children: ReactNode }
     return api.get<GifticonOrderDetail>(`/gifticons/orders/${orderId}`);
   };
 
-  const createGifticonCatalogItem = async (data: { brand: string; productName: string; price: number; emoji?: string }) => {
+  const createGifticonCatalogItem = async (data: { brand: string; productName: string; price: number; isVariablePrice?: boolean; emoji?: string }) => {
     await api.post<GifticonCatalogItem>("/gifticons/catalog", data);
     await refreshGifticonCatalog();
   };
