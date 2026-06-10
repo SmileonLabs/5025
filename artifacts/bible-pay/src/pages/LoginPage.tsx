@@ -29,21 +29,21 @@ export default function LoginPage() {
 
       <div className="w-full max-w-md relative z-10 flex flex-col gap-8">
         <div className="text-center">
-          <motion.div
+          <motion.img
+            src={`${import.meta.env.BASE_URL}logo.png`}
+            alt="5025"
             initial={{ scale: 0.8, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             transition={{ type: "spring", bounce: 0.5 }}
-            className="inline-flex items-center justify-center w-24 h-24 rounded-full bg-white shadow-md mb-6"
-          >
-            <span className="text-5xl">🎁</span>
-          </motion.div>
+            className="w-60 max-w-[80%] mx-auto mb-2 drop-shadow-sm"
+          />
           <motion.h1
             initial={{ y: 20, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             transition={{ delay: 0.1 }}
-            className="text-4xl font-black text-gray-900 tracking-tight"
+            className="sr-only"
           >
-            성경 용돈
+            5025
           </motion.h1>
           <motion.p
             initial={{ y: 20, opacity: 0 }}

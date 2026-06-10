@@ -40,10 +40,12 @@ export function AppInfoModal({ open, onClose }: AppInfoModalProps) {
               </div>
 
               <div className="flex flex-col items-center text-center mb-6">
-                <div className="w-20 h-20 rounded-[22px] bg-gradient-to-br from-primary to-accent flex items-center justify-center text-4xl shadow-lg mb-3">
-                  📖
-                </div>
-                <p className="text-2xl font-black text-gray-900">성경 용돈</p>
+                <img
+                  src={`${import.meta.env.BASE_URL}logo.png`}
+                  alt="5025"
+                  className="w-28 h-28 object-contain mb-3"
+                />
+                <p className="text-2xl font-black text-gray-900">5025</p>
                 <p className="text-sm text-gray-400 font-medium mt-1">버전 1.0.0</p>
                 <p className="text-sm text-gray-500 mt-3 leading-relaxed">
                   성경을 읽고 퀴즈를 풀면서<br />용돈도 벌고 말씀도 배우는 앱이에요.
@@ -67,7 +69,7 @@ export function AppInfoModal({ open, onClose }: AppInfoModalProps) {
                 </div>
               </div>
 
-              <p className="text-xs text-gray-400 text-center mt-5">© 2026 성경 용돈</p>
+              <p className="text-xs text-gray-400 text-center mt-5">© 2026 5025</p>
             </div>
           </motion.div>
         </>

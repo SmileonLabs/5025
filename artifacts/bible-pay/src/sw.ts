@@ -58,11 +58,11 @@ sw.addEventListener("push", (event: PushEvent) => {
     data = { body: event.data?.text() };
   }
 
-  const title = data.title || "성경 용돈";
+  const title = data.title || "5025";
   const options: NotificationOptions = {
     body: data.body || "",
-    icon: data.icon || "pwa-192.svg",
-    badge: "pwa-192.svg",
+    icon: data.icon || "pwa-192.png",
+    badge: "pwa-192.png",
     data: { url: data.url || sw.registration.scope },
   };
 
