@@ -18,10 +18,10 @@ const METHODS = [
   { id: "kakao", label: "카카오페이", emoji: "💛" },
 ];
 
-type Step = "amount" | "method" | "done";
+type Step = "amount" | "method";
 
 export function ParentTopupModal({ open, onClose }: ParentTopupModalProps) {
-  const { topupParent, parent } = useAppContext();
+  const { startTopupCheckout, parent } = useAppContext();
   const { toast } = useToast();
 
   const [step, setStep] = useState<Step>("amount");
@@ -30,7 +30,7 @@ export function ParentTopupModal({ open, onClose }: ParentTopupModalProps) {
   const [loading, setLoading] = useState(false);
 
   const numAmount = parseInt(amount.replace(/,/g, ""), 10);
-  const isValid = !isNaN(numAmount) && numAmount >= 100;
+  const isValid = !isNaN(numAmount) && numAmount >= 1000;
 
   const handleClose = () => {
     setStep("amount");
@@ -47,11 +47,10 @@ export function ParentTopupModal({ open, onClose }: ParentTopupModalProps) {
   const handleConfirm = async () => {
     setLoading(true);
     try {
-      await topupParent(numAmount);
-      setStep("done");
+      // Redirects the browser to the secure Stripe Checkout page.
+      await startTopupCheckout(numAmount);
     } catch (err: any) {
-      toast({ title: err.message ?? "충전에 실패했어요.", variant: "destructive" });
-    } finally {
+      toast({ title: err.message ?? "결제 페이지를 여는 데 실패했어요.", variant: "destructive" });
       setLoading(false);
     }
   };
@@ -83,7 +82,6 @@ export function ParentTopupModal({ open, onClose }: ParentTopupModalProps) {
                 <h2 className="text-xl font-black text-gray-900">
                   {step === "amount" && "💰 예산 충전하기"}
                   {step === "method" && "결제 방법 선택"}
-                  {step === "done" && "✅ 충전 완료!"}
                 </h2>
                 <button
                   onClick={handleClose}
@@ -130,6 +128,12 @@ export function ParentTopupModal({ open, onClose }: ParentTopupModalProps) {
                       />
                       <span className="absolute right-5 top-1/2 -translate-y-1/2 text-xl font-bold text-gray-400">원</span>
                     </div>
+
+                    {amount && numAmount < 1000 && (
+                      <p className="text-xs text-red-400 font-medium mb-3 text-right">
+                        최소 1,000원부터 충전할 수 있어요.
+                      </p>
+                    )}
 
                     <div className="flex flex-wrap gap-2 mb-6">
                       {PRESET_AMOUNTS.map(p => (
@@ -197,8 +201,10 @@ export function ParentTopupModal({ open, onClose }: ParentTopupModalProps) {
                       ))}
                     </div>
 
-                    <p className="text-xs text-gray-400 text-center mb-4">
-                      실제 결제는 발생하지 않아요. 데모 충전입니다.
+                    <p className="text-xs text-gray-400 text-center mb-4 leading-relaxed">
+                      안전한 Stripe 결제 페이지로 이동해요.<br />
+                      지금은 테스트 모드라 실제 결제는 일어나지 않아요.<br />
+                      카드번호 <span className="font-bold text-gray-500">4242 4242 4242 4242</span>로 결제해보세요.
                     </p>
 
                     <div className="flex gap-3">
@@ -215,58 +221,12 @@ export function ParentTopupModal({ open, onClose }: ParentTopupModalProps) {
                         className="flex-[2] h-[54px] rounded-[16px] font-bold text-base bg-blue-500 hover:bg-blue-600 text-white"
                         data-testid="btn-topup-confirm"
                       >
-                        {loading ? "충전 중..." : "충전하기 💰"}
+                        {loading ? "결제 페이지 여는 중..." : "결제하기 💳"}
                       </Button>
                     </div>
                   </motion.div>
                 )}
 
-                {/* STEP 3: 완료 */}
-                {step === "done" && (
-                  <motion.div
-                    key="done"
-                    initial={{ opacity: 0, scale: 0.9 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    className="flex flex-col items-center text-center gap-5 py-4"
-                  >
-                    <motion.div
-                      initial={{ scale: 0 }}
-                      animate={{ scale: [0, 1.2, 1] }}
-                      transition={{ duration: 0.5, ease: "backOut" }}
-                      className="w-20 h-20 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-4xl shadow-lg"
-                    >
-                      💰
-                    </motion.div>
-                    <div>
-                      <p className="text-2xl font-black text-gray-900 mb-1">충전 완료!</p>
-                      <p className="text-3xl font-black text-blue-500">
-                        +{numAmount.toLocaleString("ko-KR")}원
-                      </p>
-                      {(() => {
-                        const m = METHODS.find(x => x.id === selectedMethod);
-                        return m ? (
-                          <div className="inline-flex items-center gap-1.5 mt-3 px-3 py-1.5 bg-gray-100 rounded-full" data-testid="done-method">
-                            <span className="text-base">{m.emoji}</span>
-                            <span className="text-sm font-bold text-gray-600">{m.label}로 충전</span>
-                          </div>
-                        ) : null;
-                      })()}
-                      <p className="text-sm text-gray-500 mt-3">
-                        현재 잔액:{" "}
-                        <span className="font-bold text-gray-700">
-                          ₩{(parent?.balance ?? 0).toLocaleString("ko-KR")}
-                        </span>
-                      </p>
-                    </div>
-                    <Button
-                      onClick={handleClose}
-                      className="w-full h-[54px] rounded-[16px] font-bold text-base bg-blue-500 hover:bg-blue-600 text-white"
-                      data-testid="btn-topup-done"
-                    >
-                      확인
-                    </Button>
-                  </motion.div>
-                )}
               </AnimatePresence>
             </div>
           </motion.div>

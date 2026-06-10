@@ -1,5 +1,6 @@
-import React, { createContext, useState, useContext, useCallback, useEffect, ReactNode } from "react";
+import React, { createContext, useState, useContext, useCallback, useEffect, useRef, ReactNode } from "react";
 import { api } from "@/lib/api";
+import { toast } from "@/hooks/use-toast";
 
 export type Role = "parent" | "child" | null;
 
@@ -79,8 +80,9 @@ interface AppState {
   signup: (name: string, email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   childLogin: (childId: number, pin: string) => Promise<void>;
-  // Parent top-up
-  topupParent: (amount: number) => Promise<void>;
+  // Parent top-up (Stripe Checkout)
+  startTopupCheckout: (amount: number) => Promise<void>;
+  confirmTopup: (sessionId: string) => Promise<{ credited: boolean; amount: number; balance: number; status?: string }>;
   // Child management
   createChild: (name: string, age: number, avatar: string, pin: string) => Promise<void>;
   deleteChild: (childId: number) => Promise<void>;
@@ -311,10 +313,75 @@ export function AppProvider({ children: reactChildren }: { children: ReactNode }
     }
   };
 
-  const topupParent = async (amount: number) => {
-    const result = await api.post<{ balance: number }>("/auth/topup", { amount });
-    setParent(prev => prev ? { ...prev, balance: result.balance } : prev);
-  };
+  const startTopupCheckout = useCallback(async (amount: number) => {
+    const { url } = await api.post<{ url: string }>("/topups/checkout-session", { amount });
+    window.location.href = url;
+  }, []);
+
+  const confirmTopup = useCallback(async (sessionId: string) => {
+    const result = await api.post<{ credited: boolean; amount: number; balance: number; status?: string }>(
+      "/topups/confirm",
+      { sessionId },
+    );
+    setParent(prev => (prev ? { ...prev, balance: result.balance } : prev));
+    return result;
+  }, []);
+
+  // Capture the Stripe return params on first render, BEFORE the router can
+  // redirect "/" to the dashboard and strip the query string. (LoginPage, a
+  // descendant, runs its redirect effect before this provider's effect.)
+  const [stripeReturn] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return { topup: params.get("topup"), sessionId: params.get("session_id") };
+  });
+
+  // Handle the return from Stripe Checkout. The redirect lands on "/" with
+  // ?topup=success&session_id=... (or ?topup=cancel), so confirm here once the
+  // parent session is restored, then clean the URL.
+  const topupHandledRef = useRef(false);
+  useEffect(() => {
+    if (loading || topupHandledRef.current) return;
+
+    const { topup, sessionId } = stripeReturn;
+    if (!topup) return;
+
+    const cleanUrl = () => window.history.replaceState({}, "", window.location.pathname);
+
+    if (topup === "cancel") {
+      topupHandledRef.current = true;
+      cleanUrl();
+      toast({ title: "결제를 취소했어요." });
+      return;
+    }
+
+    if (topup === "success") {
+      if (!sessionId) {
+        topupHandledRef.current = true;
+        cleanUrl();
+        return;
+      }
+      // Wait until the parent session is restored, then confirm exactly once.
+      if (role !== "parent") return;
+      topupHandledRef.current = true;
+      (async () => {
+        try {
+          const result = await confirmTopup(sessionId);
+          cleanUrl();
+          if (result.credited) {
+            toast({ title: `충전 완료! +₩${result.amount.toLocaleString("ko-KR")}` });
+          } else if (result.status && result.status !== "paid") {
+            toast({ title: "결제가 아직 완료되지 않았어요.", variant: "destructive" });
+          } else {
+            toast({ title: "이미 처리된 결제예요." });
+          }
+        } catch (err) {
+          topupHandledRef.current = false;
+          const message = err instanceof Error ? err.message : "결제 확인에 실패했어요.";
+          toast({ title: message, variant: "destructive" });
+        }
+      })();
+    }
+  }, [loading, role, confirmTopup, stripeReturn]);
 
   const spendAllowance = async (childId: number, amount: number, purpose: string, category?: string): Promise<boolean> => {
     try {
@@ -345,7 +412,7 @@ export function AppProvider({ children: reactChildren }: { children: ReactNode }
     <AppContext.Provider value={{
       role, loading, parent, currentChild, children, transactions, parentTransactions, missions, pendingLogs, childRequests,
       login, signup, logout, childLogin,
-      topupParent,
+      startTopupCheckout, confirmTopup,
       createChild, deleteChild, refreshChildren,
       createMission, updateMission, deleteMission, refreshMissions,
       submitMission,

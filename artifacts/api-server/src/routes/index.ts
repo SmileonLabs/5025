@@ -7,6 +7,7 @@ import transactionsRouter from "./transactions";
 import missionsRouter from "./missions";
 import requestsRouter from "./requests";
 import pushRouter from "./push";
+import topupsRouter from "./topups";
 
 const router: IRouter = Router();
 
@@ -18,5 +19,6 @@ router.use(transactionsRouter);
 router.use(missionsRouter);
 router.use(requestsRouter);
 router.use(pushRouter);
+router.use(topupsRouter);
 
 export default router;

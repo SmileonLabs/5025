@@ -99,26 +99,6 @@ router.post("/auth/child-login", async (req, res) => {
   res.json({ id: child.id, name: child.name, age: child.age, avatar: child.avatar, balance: child.balance, parentId: child.parentId });
 });
 
-// POST /api/auth/topup — parent tops up their own balance
-router.post("/auth/topup", async (req, res) => {
-  if (!req.session.parentId) {
-    res.status(401).json({ error: "부모 로그인이 필요해요." });
-    return;
-  }
-  const parsed = z.object({ amount: z.number().int().min(100).max(1000000) }).safeParse(req.body);
-  if (!parsed.success) {
-    res.status(400).json({ error: "100원 이상 입력해주세요." });
-    return;
-  }
-  const { amount } = parsed.data;
-  const [parent] = await db
-    .update(parentsTable)
-    .set({ balance: (await db.select().from(parentsTable).where(eq(parentsTable.id, req.session.parentId)).limit(1))[0].balance + amount })
-    .where(eq(parentsTable.id, req.session.parentId))
-    .returning();
-  res.json({ balance: parent.balance });
-});
-
 // POST /api/auth/logout
 router.post("/auth/logout", (req, res) => {
   req.session.destroy(() => {
