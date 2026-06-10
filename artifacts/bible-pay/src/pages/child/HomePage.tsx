@@ -79,7 +79,7 @@ export default function HomePage() {
 
           <div className="relative z-10">
             <p className="text-white/70 font-medium mb-1 text-sm">내 잔액</p>
-            <h2 className="text-4xl font-black mb-5">₩{currentChild.balance.toLocaleString("ko-KR")}</h2>
+            <h2 className="text-4xl font-black mb-5">{currentChild.balance.toLocaleString("ko-KR")}P</h2>
 
             <div className="flex gap-2">
               <button
@@ -110,7 +110,7 @@ export default function HomePage() {
             data-testid="stat-earned"
           >
             <p className="text-xs text-gray-400 font-medium mb-1">총 번 용돈</p>
-            <p className="font-black text-emerald-500 text-base">+{totalEarned.toLocaleString("ko-KR")}원</p>
+            <p className="font-black text-emerald-500 text-base">+{totalEarned.toLocaleString("ko-KR")}P</p>
           </button>
           <button
             onClick={() => setLocation("/child/ledger?filter=earned")}

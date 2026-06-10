@@ -55,7 +55,7 @@ export default function BibleChapterPage() {
           <h1 className="text-lg font-bold text-gray-900">
             {step === "book" ? "성경 책 선택" : `${selectedBook?.name} — 장 선택`}
           </h1>
-          <p className="text-xs text-gray-400">{mission.title} · +{mission.reward.toLocaleString("ko-KR")}원</p>
+          <p className="text-xs text-gray-400">{mission.title} · +{mission.reward.toLocaleString("ko-KR")}P</p>
         </div>
       </div>
 

@@ -22,7 +22,13 @@ _Replace the heading above with the project's name, and this line with one sente
 
 ## Where things live
 
-_Populate as you build — short repo map plus pointers to the source-of-truth file for DB schema, API contracts, theme files, etc._
+- DB 스키마(소스오브트루스): `lib/db/src/schema/` — 기프티콘 카탈로그는 `gifticonCatalogItems.ts`, 주문은 `gifticonOrders.ts`. barrel은 `schema/index.ts`. 모든 테이블이 여기서 export.
+- 기프티콘 API: `artifacts/api-server/src/routes/gifticons.ts` — 카탈로그 CRUD(부모), 세션 스코프 조회(아이→부모 카탈로그), 주문 생성/취소, 부모 발급·거절 PATCH, 운영자(admin) 라우트.
+- 잔액 차감·환불·발급 원자성: `artifacts/api-server/src/lib/gifticonCredit.ts` (조건부 UPDATE, requireParentId IDOR 가드).
+- 포인트 환산(서버 권위): `artifacts/api-server/src/topupCredit.ts` — `POINTS_PER_KRW`(=10). 충전 라우트는 `routes/topups.ts`.
+- 포인트 표시(프론트): `artifacts/bible-pay/src/lib/utils.ts` — `POINTS_PER_KRW`, `formatPoints()`.
+- 부모 기프티콘 관리 UI: `artifacts/bible-pay/src/pages/parent/GifticonsPage.tsx` (구매요청 발급/거절 + 상품관리 CRUD 탭).
+- 아이 상점 UI: `artifacts/bible-pay/src/pages/child/ShopPage.tsx`. 전역 상태/헬퍼: `src/context/AppContext.tsx`.
 
 ## Architecture decisions
 
@@ -34,7 +40,11 @@ _Populate as you build — short repo map plus pointers to the source-of-truth f
 
 ## Product
 
-_Describe the high-level user-facing capabilities of this app once they exist._
+한국 아이용 성경-용돈 PWA. 모든 금액 단위는 **포인트(P)**.
+
+- **부모**: 회원가입/로그인, 아이 계정 생성(PIN 4자리), 용돈 충전(Stripe 결제 → 결제 원금 ×10 포인트 적립), 미션 관리, 기프티콘 상품 카탈로그 등록/삭제(부모별), 아이 구매요청 발급/거절(거절 시 자동 환불).
+- **아이**: PIN 로그인, 미션 수행·성경 읽기·퀴즈로 포인트 획득, 상점에서 **자기 부모가 등록한** 기프티콘만 구매(구매 즉시 잔액 차감), 발급 전 구매 취소/환불.
+- **운영자(admin)**: 부모 발급/거절과 별도로 기프티콘 발급·거절 경로 유지.
 
 ## User preferences
 

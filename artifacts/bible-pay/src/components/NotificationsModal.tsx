@@ -44,13 +44,13 @@ export function NotificationsModal({ open, onClose }: NotificationsModalProps) {
         list.push({
           id: `tx-${tx.id}`, ts, icon: BookOpen, bg: "bg-green-50", color: "text-green-600",
           title: "미션 보상을 받았어요! 🎉",
-          body: `${tx.description} · +${tx.amount.toLocaleString("ko-KR")}원`,
+          body: `${tx.description} · +${tx.amount.toLocaleString("ko-KR")}P`,
         });
       } else if (tx.type === "charge" && prefs.charge) {
         list.push({
           id: `tx-${tx.id}`, ts, icon: Coins, bg: "bg-blue-50", color: "text-blue-500",
           title: "용돈이 충전됐어요 💰",
-          body: `${tx.description} · +${tx.amount.toLocaleString("ko-KR")}원`,
+          body: `${tx.description} · +${tx.amount.toLocaleString("ko-KR")}P`,
         });
       }
     }
@@ -62,7 +62,7 @@ export function NotificationsModal({ open, onClose }: NotificationsModalProps) {
           id: `m-${m.id}`, ts: new Date(m.createdAt).getTime(), icon: Sparkles,
           bg: "bg-amber-50", color: "text-amber-500",
           title: "새로운 미션이 있어요 ✨",
-          body: `${m.title} · ${m.reward.toLocaleString("ko-KR")}원`,
+          body: `${m.title} · ${m.reward.toLocaleString("ko-KR")}P`,
         });
       }
     }

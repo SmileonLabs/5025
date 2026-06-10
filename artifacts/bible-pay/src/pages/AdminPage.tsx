@@ -271,12 +271,12 @@ function AdminOrderCard({ order, onChanged }: { order: AdminOrder; onChanged: ()
           <span className={`inline-block px-2.5 py-1 rounded-full text-[11px] font-bold ${meta.cls}`}>
             {meta.label}
           </span>
-          <p className="text-sm font-black text-gray-900 mt-1">{order.price.toLocaleString("ko-KR")}원</p>
+          <p className="text-sm font-black text-gray-900 mt-1">{order.price.toLocaleString("ko-KR")}P</p>
         </div>
       </div>
 
       <p className="mt-2 text-[11px] text-gray-400">
-        액면가 {order.faceValue.toLocaleString("ko-KR")}원 · 판매가 {order.price.toLocaleString("ko-KR")}원
+        액면가 {order.faceValue.toLocaleString("ko-KR")}P · 판매가 {order.price.toLocaleString("ko-KR")}P
       </p>
 
       {order.status === "fulfilled" && (

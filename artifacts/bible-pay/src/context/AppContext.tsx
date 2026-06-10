@@ -65,12 +65,13 @@ export interface PendingLog {
 }
 
 export interface GifticonCatalogItem {
-  id: string;
+  id: number;
+  parentId: number;
   brand: string;
   productName: string;
-  faceValue: number;
   price: number;
   emoji: string;
+  createdAt: string;
 }
 
 export type GifticonStatus = "requested" | "fulfilled" | "rejected" | "canceled";
@@ -89,6 +90,9 @@ export interface GifticonOrder {
   rejectReason: string | null;
   fulfilledAt: string | null;
   createdAt: string;
+  // Present only on the parent-scoped list (joined from the child row).
+  childName?: string;
+  childAvatar?: string;
 }
 
 export interface GifticonOrderDetail extends GifticonOrder {
@@ -117,7 +121,7 @@ interface AppState {
   childLogin: (childId: number, pin: string) => Promise<void>;
   // Parent top-up (Stripe Checkout)
   startTopupCheckout: (amount: number) => Promise<void>;
-  confirmTopup: (sessionId: string) => Promise<{ credited: boolean; amount: number; balance: number; status?: string }>;
+  confirmTopup: (sessionId: string) => Promise<{ credited: boolean; paidAmount: number; creditedPoints: number; balance: number; status?: string }>;
   // Child management
   createChild: (name: string, age: number, avatar: string, pin: string) => Promise<void>;
   deleteChild: (childId: number) => Promise<void>;
@@ -149,6 +153,12 @@ interface AppState {
   buyGifticon: (catalogItemId: string) => Promise<void>;
   cancelGifticonOrder: (orderId: number) => Promise<void>;
   getGifticonOrderDetail: (orderId: number) => Promise<GifticonOrderDetail>;
+  // Gifticon catalog management (parent)
+  createGifticonCatalogItem: (data: { brand: string; productName: string; price: number; emoji?: string }) => Promise<void>;
+  deleteGifticonCatalogItem: (id: number) => Promise<void>;
+  // Gifticon fulfillment / rejection (parent)
+  fulfillGifticonOrderByParent: (orderId: number, issued?: { issuedPin?: string; issuedBarcode?: string; issuedImageUrl?: string }) => Promise<void>;
+  rejectGifticonOrderByParent: (orderId: number, reason?: string) => Promise<void>;
 }
 
 const AppContext = createContext<AppState | undefined>(undefined);
@@ -224,18 +234,20 @@ export function AppProvider({ children: reactChildren }: { children: ReactNode }
         if (me.role === "parent") {
           setRole("parent");
           setParent({ id: me.id, name: me.name, email: me.email, balance: me.balance });
-          const [kids, missionList, pending, parentTxs, requests] = await Promise.all([
+          const [kids, missionList, pending, parentTxs, requests, gOrders] = await Promise.all([
             api.get<ChildData[]>("/children"),
             api.get<Mission[]>("/missions"),
             api.get<PendingLog[]>("/missions/pending"),
             api.get<Transaction[]>("/transactions/all"),
             api.get<ChildRequest[]>("/requests"),
+            api.get<GifticonOrder[]>("/gifticons/orders"),
           ]);
           setChildren(kids);
           setMissions(missionList);
           setPendingLogs(pending);
           setParentTransactions(parentTxs);
           setChildRequests(requests);
+          setGifticonOrders(gOrders);
         } else if (me.role === "child") {
           setRole("child");
           setCurrentChild({ id: me.id, name: me.name, age: me.age, avatar: me.avatar, balance: me.balance, parentId: me.parentId });
@@ -263,18 +275,20 @@ export function AppProvider({ children: reactChildren }: { children: ReactNode }
     setParent(data);
     setRole("parent");
     setCurrentChild(null);
-    const [kids, missionList, pending, parentTxs, requests] = await Promise.all([
+    const [kids, missionList, pending, parentTxs, requests, gOrders] = await Promise.all([
       api.get<ChildData[]>("/children"),
       api.get<Mission[]>("/missions"),
       api.get<PendingLog[]>("/missions/pending"),
       api.get<Transaction[]>("/transactions/all"),
       api.get<ChildRequest[]>("/requests"),
+      api.get<GifticonOrder[]>("/gifticons/orders"),
     ]);
     setChildren(kids);
     setMissions(missionList);
     setPendingLogs(pending);
     setParentTransactions(parentTxs);
     setChildRequests(requests);
+    setGifticonOrders(gOrders);
   };
 
   const signup = async (name: string, email: string, password: string) => {
@@ -401,7 +415,7 @@ export function AppProvider({ children: reactChildren }: { children: ReactNode }
   }, []);
 
   const confirmTopup = useCallback(async (sessionId: string) => {
-    const result = await api.post<{ credited: boolean; amount: number; balance: number; status?: string }>(
+    const result = await api.post<{ credited: boolean; paidAmount: number; creditedPoints: number; balance: number; status?: string }>(
       "/topups/confirm",
       { sessionId },
     );
@@ -431,11 +445,11 @@ export function AppProvider({ children: reactChildren }: { children: ReactNode }
     const channel = new BroadcastChannel("bible-pay-topup");
     topupChannelRef.current = channel;
     channel.onmessage = (e: MessageEvent) => {
-      const data = e.data as { type?: string; balance?: number; amount?: number };
+      const data = e.data as { type?: string; balance?: number; creditedPoints?: number };
       if (data?.type === "topup-success" && typeof data.balance === "number") {
         const newBalance = data.balance;
         setParent(prev => (prev ? { ...prev, balance: newBalance } : prev));
-        toast({ title: `충전 완료! +₩${Number(data.amount ?? 0).toLocaleString("ko-KR")}` });
+        toast({ title: `충전 완료! +${Number(data.creditedPoints ?? 0).toLocaleString("ko-KR")}P` });
       }
     };
     return () => {
@@ -473,11 +487,11 @@ export function AppProvider({ children: reactChildren }: { children: ReactNode }
           const result = await confirmTopup(sessionId);
           cleanUrl();
           if (result.credited) {
-            toast({ title: `충전 완료! +₩${result.amount.toLocaleString("ko-KR")}` });
+            toast({ title: `충전 완료! +${result.creditedPoints.toLocaleString("ko-KR")}P` });
             topupChannelRef.current?.postMessage({
               type: "topup-success",
               balance: result.balance,
-              amount: result.amount,
+              creditedPoints: result.creditedPoints,
             });
           } else if (result.status && result.status !== "paid") {
             toast({ title: "결제가 아직 완료되지 않았어요.", variant: "destructive" });
@@ -489,7 +503,7 @@ export function AppProvider({ children: reactChildren }: { children: ReactNode }
             topupChannelRef.current?.postMessage({
               type: "topup-success",
               balance: result.balance,
-              amount: result.amount,
+              creditedPoints: result.creditedPoints,
             });
           }
         } catch (err) {
@@ -558,6 +572,32 @@ export function AppProvider({ children: reactChildren }: { children: ReactNode }
     return api.get<GifticonOrderDetail>(`/gifticons/orders/${orderId}`);
   };
 
+  const createGifticonCatalogItem = async (data: { brand: string; productName: string; price: number; emoji?: string }) => {
+    await api.post<GifticonCatalogItem>("/gifticons/catalog", data);
+    await refreshGifticonCatalog();
+  };
+
+  const deleteGifticonCatalogItem = async (id: number) => {
+    await api.delete(`/gifticons/catalog/${id}`);
+    await refreshGifticonCatalog();
+  };
+
+  const fulfillGifticonOrderByParent = async (
+    orderId: number,
+    issued?: { issuedPin?: string; issuedBarcode?: string; issuedImageUrl?: string },
+  ) => {
+    await api.patch<GifticonOrder>(`/gifticons/orders/${orderId}/fulfill`, issued ?? {});
+    await refreshGifticonOrders();
+  };
+
+  const rejectGifticonOrderByParent = async (orderId: number, reason?: string) => {
+    await api.patch<{ order: GifticonOrder; childBalance: number }>(
+      `/gifticons/orders/${orderId}/reject`,
+      { reason },
+    );
+    await refreshGifticonOrders();
+  };
+
   return (
     <AppContext.Provider value={{
       role, loading, parent, currentChild, children, transactions, parentTransactions, missions, pendingLogs, childRequests,
@@ -571,6 +611,8 @@ export function AppProvider({ children: reactChildren }: { children: ReactNode }
       createRequest, refreshRequests, resolveRequest,
       gifticonCatalog, gifticonOrders, refreshGifticonCatalog, refreshGifticonOrders,
       buyGifticon, cancelGifticonOrder, getGifticonOrderDetail,
+      createGifticonCatalogItem, deleteGifticonCatalogItem,
+      fulfillGifticonOrderByParent, rejectGifticonOrderByParent,
     }}>
       {reactChildren}
     </AppContext.Provider>

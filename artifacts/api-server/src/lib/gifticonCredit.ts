@@ -6,7 +6,21 @@ import {
   gifticonOrdersTable,
   type GifticonOrder,
 } from "@workspace/db";
-import type { GifticonCatalogItem } from "./gifticonCatalog";
+
+/**
+ * Snapshot of a catalog item required to create an order. The caller resolves
+ * this from the per-parent DB catalog (price authoritative on the server); the
+ * fields are copied onto the order row so deleting the catalog item later never
+ * breaks order history.
+ */
+export interface OrderableItem {
+  id: string;
+  brand: string;
+  productName: string;
+  faceValue: number;
+  price: number;
+  emoji: string;
+}
 
 export type CreateOrderResult =
   | { ok: true; order: GifticonOrder; childBalance: number }
@@ -21,7 +35,7 @@ export type CreateOrderResult =
 export async function createGifticonOrder(params: {
   childId: number;
   parentId: number;
-  item: GifticonCatalogItem;
+  item: OrderableItem;
 }): Promise<CreateOrderResult> {
   const { childId, parentId, item } = params;
   return db.transaction(async (tx) => {
@@ -70,15 +84,18 @@ export type RefundResult =
  * Refund an order exactly once. The conditional UPDATE (status='requested')
  * guarantees only the first caller flips the status and issues the refund, so a
  * double cancel/reject can't refund twice. Pass `requireChildId` to scope a
- * child-initiated cancel to their own order.
+ * child-initiated cancel, or `requireParentId` to scope a parent-initiated
+ * reject — the ownership check lives in the WHERE clause (no pre-fetch) so a
+ * cross-household reject (IDOR) atomically matches no row.
  */
 export async function refundGifticonOrder(params: {
   orderId: number;
   newStatus: "rejected" | "canceled";
   rejectReason?: string | null;
   requireChildId?: number;
+  requireParentId?: number;
 }): Promise<RefundResult> {
-  const { orderId, newStatus, rejectReason, requireChildId } = params;
+  const { orderId, newStatus, rejectReason, requireChildId, requireParentId } = params;
   return db.transaction(async (tx) => {
     const conditions = [
       eq(gifticonOrdersTable.id, orderId),
@@ -86,6 +103,9 @@ export async function refundGifticonOrder(params: {
     ];
     if (requireChildId !== undefined) {
       conditions.push(eq(gifticonOrdersTable.childId, requireChildId));
+    }
+    if (requireParentId !== undefined) {
+      conditions.push(eq(gifticonOrdersTable.parentId, requireParentId));
     }
 
     const [order] = await tx
@@ -122,17 +142,27 @@ export async function refundGifticonOrder(params: {
 }
 
 /**
- * Operator marks an order fulfilled with the manually-issued gifticon details.
- * Conditional on status='requested' so a double-fulfill is a no-op (returns
- * undefined). No balance change — the price was already deducted at request.
+ * Mark an order fulfilled with the (optionally) manually-issued gifticon
+ * details. Conditional on status='requested' so a double-fulfill is a no-op
+ * (returns undefined). No balance change — the price was already deducted at
+ * request time. Pass `requireParentId` to scope a parent-initiated fulfill to
+ * their own household; the check lives in the WHERE clause (IDOR-safe).
  */
 export async function fulfillGifticonOrder(params: {
   orderId: number;
   issuedPin?: string | null;
   issuedBarcode?: string | null;
   issuedImageUrl?: string | null;
+  requireParentId?: number;
 }): Promise<GifticonOrder | undefined> {
-  const { orderId, issuedPin, issuedBarcode, issuedImageUrl } = params;
+  const { orderId, issuedPin, issuedBarcode, issuedImageUrl, requireParentId } = params;
+  const conditions = [
+    eq(gifticonOrdersTable.id, orderId),
+    eq(gifticonOrdersTable.status, "requested"),
+  ];
+  if (requireParentId !== undefined) {
+    conditions.push(eq(gifticonOrdersTable.parentId, requireParentId));
+  }
   const [order] = await db
     .update(gifticonOrdersTable)
     .set({
@@ -142,7 +172,7 @@ export async function fulfillGifticonOrder(params: {
       issuedImageUrl: issuedImageUrl ?? null,
       fulfilledAt: new Date(),
     })
-    .where(and(eq(gifticonOrdersTable.id, orderId), eq(gifticonOrdersTable.status, "requested")))
+    .where(and(...conditions))
     .returning();
   return order;
 }

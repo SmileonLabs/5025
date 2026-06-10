@@ -15,6 +15,7 @@ import DashboardPage from "@/pages/parent/DashboardPage";
 import ChargePage from "@/pages/parent/ChargePage";
 import ParentMissionsPage from "@/pages/parent/MissionsPage";
 import HistoryPage from "@/pages/parent/HistoryPage";
+import ParentGifticonsPage from "@/pages/parent/GifticonsPage";
 import HomePage from "@/pages/child/HomePage";
 import MissionsPage from "@/pages/child/MissionsPage";
 import LedgerPage from "@/pages/child/LedgerPage";
@@ -39,6 +40,7 @@ function Router() {
       <Route path="/parent/charge" component={ChargePage} />
       <Route path="/parent/missions" component={ParentMissionsPage} />
       <Route path="/parent/history" component={HistoryPage} />
+      <Route path="/parent/gifticons" component={ParentGifticonsPage} />
 
       <Route path="/child/home" component={HomePage} />
       <Route path="/child/missions" component={MissionsPage} />

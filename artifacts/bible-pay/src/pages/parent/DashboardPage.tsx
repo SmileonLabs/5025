@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
-import { Plus, ChevronRight, LogOut, UserPlus, PlusCircle, ClipboardList, Check, X } from "lucide-react";
+import { Plus, ChevronRight, LogOut, UserPlus, PlusCircle, ClipboardList, Gift, Check, X } from "lucide-react";
 import { useAppContext } from "@/context/AppContext";
 import { Button } from "@/components/ui/button";
 import { BibleIllustration } from "@/components/BibleIllustration";
@@ -17,7 +17,7 @@ const REQUEST_TYPE_META: Record<string, { emoji: string; label: string }> = {
 
 export default function DashboardPage() {
   const [_, setLocation] = useLocation();
-  const { parent, children, parentTransactions, logout, pendingLogs, missions, childRequests, resolveRequest } = useAppContext();
+  const { parent, children, parentTransactions, logout, pendingLogs, missions, childRequests, resolveRequest, gifticonOrders } = useAppContext();
   const [createOpen, setCreateOpen] = useState(false);
   const [topupOpen, setTopupOpen] = useState(false);
 
@@ -33,6 +33,7 @@ export default function DashboardPage() {
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
     .slice(0, 3);
   const pendingRequests = childRequests.filter(r => r.status === "pending");
+  const pendingGifticons = gifticonOrders.filter(o => o.status === "requested").length;
 
   const handleLogout = async () => {
     await logout();
@@ -58,7 +59,7 @@ export default function DashboardPage() {
           <div className="relative z-10 flex items-center justify-between">
             <div>
               <p className="text-blue-100 text-sm font-medium mb-1">내 예산 잔액</p>
-              <p className="text-3xl font-black text-white">₩{parent.balance.toLocaleString("ko-KR")}</p>
+              <p className="text-3xl font-black text-white">{parent.balance.toLocaleString("ko-KR")}P</p>
             </div>
             <button
               onClick={() => setTopupOpen(true)}
@@ -77,7 +78,7 @@ export default function DashboardPage() {
         <div className="flex gap-3 mb-1">
           <div className="flex-1 bg-primary/10 rounded-[18px] p-3.5 border border-primary/20">
             <p className="text-xs font-medium text-primary-foreground/70 mb-0.5">아이들 총 잔액</p>
-            <p className="text-xl font-bold text-primary-foreground">{totalBalance.toLocaleString("ko-KR")}원</p>
+            <p className="text-xl font-bold text-primary-foreground">{totalBalance.toLocaleString("ko-KR")}P</p>
           </div>
           <div className="flex-1 bg-secondary/20 rounded-[18px] p-3.5 border border-secondary/30">
             <p className="text-xs font-medium text-secondary-foreground/70 mb-0.5">아이 수</p>
@@ -103,6 +104,19 @@ export default function DashboardPage() {
             {pendingLogs.length > 0 && (
               <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-[10px] font-black rounded-full flex items-center justify-center">
                 {pendingLogs.length}
+              </span>
+            )}
+          </Button>
+          <Button
+            onClick={() => setLocation("/parent/gifticons")}
+            variant="outline"
+            className="h-[52px] px-4 rounded-[16px] font-bold border-gray-200 relative"
+            data-testid="btn-go-gifticons"
+          >
+            <Gift className="w-5 h-5" />
+            {pendingGifticons > 0 && (
+              <span className="absolute -top-1 -right-1 w-5 h-5 bg-amber-400 text-white text-[10px] font-black rounded-full flex items-center justify-center">
+                {pendingGifticons}
               </span>
             )}
           </Button>
@@ -216,13 +230,13 @@ export default function DashboardPage() {
                           <p className="text-sm text-gray-400">{child.age}세</p>
                         </div>
                       </div>
-                      <div className="font-bold text-xl">{child.balance.toLocaleString("ko-KR")}원</div>
+                      <div className="font-bold text-xl">{child.balance.toLocaleString("ko-KR")}P</div>
                     </div>
                     {hasMissions ? (
                       <div>
                         <div className="flex justify-between text-xs text-gray-500 mb-1.5 font-medium">
                           <span>미션 전부 달성 시 최대 보상</span>
-                          <span>{child.balance.toLocaleString("ko-KR")} / {activeMissionTotal.toLocaleString("ko-KR")}원</span>
+                          <span>{child.balance.toLocaleString("ko-KR")} / {activeMissionTotal.toLocaleString("ko-KR")}P</span>
                         </div>
                         <div className="h-3 w-full bg-gray-100 rounded-full overflow-hidden">
                           <div className="h-full bg-secondary/80 rounded-full transition-all" style={{ width: `${progress}%` }} />

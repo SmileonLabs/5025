@@ -103,7 +103,7 @@ function MissionCreateModal({ onClose }: { onClose: () => void }) {
               onChange={e => setReward(e.target.value)}
               className="w-full px-4 py-3 rounded-[14px] border border-gray-200 text-sm font-medium focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 pr-10"
             />
-            <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-bold">원</span>
+            <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-bold">P</span>
           </div>
         </div>
 
@@ -140,7 +140,7 @@ function PendingCard({ log, onApprove, onReject }: { log: PendingLog; onApprove:
           <p className="text-xs text-gray-500 truncate">{log.mission.title}</p>
         </div>
         <div className="bg-orange-100 text-orange-700 px-2.5 py-1 rounded-full text-xs font-bold">
-          +{log.mission.reward.toLocaleString("ko-KR")}원
+          +{log.mission.reward.toLocaleString("ko-KR")}P
         </div>
       </div>
       <p className="text-xs text-gray-400 mb-3">
@@ -160,7 +160,7 @@ function PendingCard({ log, onApprove, onReject }: { log: PendingLog; onApprove:
           disabled={loading}
           className="flex-1 py-2.5 rounded-[12px] bg-green-500 text-white font-bold text-sm flex items-center justify-center gap-1.5 hover:bg-green-600 transition-colors"
         >
-          <CheckCircle className="w-4 h-4" /> 승인 (+{log.mission.reward.toLocaleString("ko-KR")}원)
+          <CheckCircle className="w-4 h-4" /> 승인 (+{log.mission.reward.toLocaleString("ko-KR")}P)
         </button>
       </div>
     </div>
@@ -256,7 +256,7 @@ export default function ParentMissionsPage() {
                       <div className="flex-1 min-w-0">
                         <p className="font-bold text-gray-900">{m.title}</p>
                         {m.description && <p className="text-xs text-gray-500 mt-0.5 truncate">{m.description}</p>}
-                        <p className="text-sm font-black text-primary-foreground mt-1">+{m.reward.toLocaleString("ko-KR")}원</p>
+                        <p className="text-sm font-black text-primary-foreground mt-1">+{m.reward.toLocaleString("ko-KR")}P</p>
                       </div>
                       <div className="flex items-center gap-1 shrink-0">
                         <button onClick={() => handleToggle(m)} className={`p-1 rounded-lg transition-colors ${m.isActive ? "text-green-500" : "text-gray-300"}`}>

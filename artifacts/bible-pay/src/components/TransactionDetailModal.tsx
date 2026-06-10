@@ -140,7 +140,7 @@ export function TransactionDetailModal({ transactionId, open, onClose, showChild
                     <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mt-1">{config.label}</p>
                     <p className="font-bold text-gray-900 text-base leading-snug">{detail.description}</p>
                     <p className={`text-3xl font-black tabular-nums ${isPositive ? "text-emerald-500" : "text-red-500"}`}>
-                      {isPositive ? "+" : ""}{detail.amount.toLocaleString("ko-KR")}원
+                      {isPositive ? "+" : ""}{detail.amount.toLocaleString("ko-KR")}P
                     </p>
                   </div>
 

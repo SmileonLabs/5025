@@ -157,7 +157,7 @@ export function SpendModal({ open, onClose, childId, balance }: SpendModalProps)
                   <motion.div key="amount" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="pb-8">
                     <div className="bg-gray-50 rounded-[20px] p-4 mb-5 flex justify-between items-center">
                       <span className="text-sm text-gray-500 font-medium">현재 잔액</span>
-                      <span className="font-black text-gray-900 text-lg">₩{balance.toLocaleString("ko-KR")}</span>
+                      <span className="font-black text-gray-900 text-lg">{balance.toLocaleString("ko-KR")}P</span>
                     </div>
 
                     <div className="relative mb-4">
@@ -171,7 +171,7 @@ export function SpendModal({ open, onClose, childId, balance }: SpendModalProps)
                         data-testid="input-spend-amount"
                         autoFocus
                       />
-                      <span className="absolute right-5 top-1/2 -translate-y-1/2 text-xl font-bold text-gray-400">원</span>
+                      <span className="absolute right-5 top-1/2 -translate-y-1/2 text-xl font-bold text-gray-400">P</span>
                     </div>
 
                     {!isNaN(numAmount) && numAmount > balance && (
@@ -183,7 +183,7 @@ export function SpendModal({ open, onClose, childId, balance }: SpendModalProps)
                         <button key={p} onClick={() => setAmount(p.toLocaleString("ko-KR"))}
                           className="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-full text-sm font-bold text-gray-700 transition-colors"
                           data-testid={`preset-spend-${p}`}>
-                          {p.toLocaleString("ko-KR")}원
+                          {p.toLocaleString("ko-KR")}P
                         </button>
                       ))}
                     </div>
@@ -204,10 +204,10 @@ export function SpendModal({ open, onClose, childId, balance }: SpendModalProps)
                       <p className="text-gray-600 text-sm mb-1 font-medium">이걸 살 거예요</p>
                       <p className="text-xl font-black text-gray-900 mb-4">"{purpose}"</p>
                       <div className="inline-block bg-white rounded-[14px] px-6 py-3 shadow-sm">
-                        <p className="text-3xl font-black text-red-500">-{numAmount.toLocaleString("ko-KR")}원</p>
+                        <p className="text-3xl font-black text-red-500">-{numAmount.toLocaleString("ko-KR")}P</p>
                       </div>
                       <p className="text-sm text-gray-500 mt-3">
-                        남은 잔액: <span className="font-bold text-gray-700">₩{(balance - numAmount).toLocaleString("ko-KR")}</span>
+                        남은 잔액: <span className="font-bold text-gray-700">{(balance - numAmount).toLocaleString("ko-KR")}P</span>
                       </p>
                     </div>
 
@@ -230,7 +230,7 @@ export function SpendModal({ open, onClose, childId, balance }: SpendModalProps)
                     </motion.div>
                     <div>
                       <p className="text-lg font-black text-gray-900">{purpose}</p>
-                      <p className="text-3xl font-black text-red-500 mt-1">-{numAmount.toLocaleString("ko-KR")}원</p>
+                      <p className="text-3xl font-black text-red-500 mt-1">-{numAmount.toLocaleString("ko-KR")}P</p>
                       <p className="text-sm text-gray-500 mt-2">용돈기입장에 기록됐어요!</p>
                     </div>
                     <Button onClick={handleClose} className="w-full h-[54px] rounded-[16px] font-bold text-base" data-testid="btn-done-spend">확인</Button>

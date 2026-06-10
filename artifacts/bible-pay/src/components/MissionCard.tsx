@@ -37,7 +37,7 @@ export function MissionCard({ mission, childId }: MissionCardProps) {
       await submitMission(mission.id);
       setDone(true);
       if (mission.type === "auto") {
-        toast({ title: `🎉 완료! +${mission.reward.toLocaleString("ko-KR")}원 지급됐어요!` });
+        toast({ title: `🎉 완료! +${mission.reward.toLocaleString("ko-KR")}P 지급됐어요!` });
       } else {
         toast({ title: "📨 완료 요청을 보냈어요!", description: "부모님이 확인하면 용돈이 지급돼요." });
       }
@@ -62,7 +62,7 @@ export function MissionCard({ mission, childId }: MissionCardProps) {
           </div>
         </div>
         <div className="bg-yellow-50 text-yellow-700 px-3 py-1 rounded-full text-sm font-bold border border-yellow-200 shrink-0">
-          +{mission.reward.toLocaleString("ko-KR")}원
+          +{mission.reward.toLocaleString("ko-KR")}P
         </div>
       </div>
 

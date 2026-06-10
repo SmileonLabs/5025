@@ -4,12 +4,18 @@ import { db, parentsTable, topupsTable } from "@workspace/db";
 /** Stripe Checkout metadata marker for parent budget top-ups. */
 export const TOPUP_KIND = "budget_topup";
 
+/** Points credited per KRW paid. 1,000원 결제 → 10,000포인트(×10), 즉 1P = 0.1원. */
+export const POINTS_PER_KRW = 10;
+
 /**
  * Idempotently credit a parent's budget for a paid Checkout session.
  *
  * The UNIQUE `stripe_session_id` column plus `onConflictDoNothing` makes a
  * repeated confirm (e.g. reloading the success URL) a no-op: only the first
  * insert applies the balance bump.
+ *
+ * `topups.amount` stores the paid amount in KRW (for Stripe reconciliation),
+ * while the parent's balance is credited in points at `POINTS_PER_KRW` per KRW.
  *
  * Returns true if this call applied the credit, false if it was already
  * credited (conflict) or the amount was non-positive.
@@ -32,7 +38,7 @@ export async function creditBudgetTopup(params: {
     if (amount > 0) {
       await tx
         .update(parentsTable)
-        .set({ balance: sql`${parentsTable.balance} + ${amount}` })
+        .set({ balance: sql`${parentsTable.balance} + ${amount * POINTS_PER_KRW}` })
         .where(eq(parentsTable.id, parentId));
     }
     return true;

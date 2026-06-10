@@ -52,8 +52,8 @@ export default function ShopPage() {
     if (!selected) return;
     setBuying(true);
     try {
-      await buyGifticon(selected.id);
-      toast({ title: "구매 완료! 운영자가 곧 발급해드려요 🎁" });
+      await buyGifticon(String(selected.id));
+      toast({ title: "구매 완료! 부모님이 확인 후 보내주실 거예요 🎁" });
       setSelected(null);
       setTab("mine");
     } catch (err) {
@@ -99,7 +99,7 @@ export default function ShopPage() {
           <div className="absolute top-0 right-0 w-28 h-28 bg-white/20 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2" />
           <div className="relative z-10">
             <p className="text-white/70 font-medium text-sm mb-1">내 잔액</p>
-            <h2 className="text-3xl font-black">₩{balance.toLocaleString("ko-KR")}</h2>
+            <h2 className="text-3xl font-black">{balance.toLocaleString("ko-KR")}P</h2>
           </div>
         </div>
       </div>
@@ -158,7 +158,7 @@ export default function ShopPage() {
                   </div>
                   <div className="mt-auto pt-1">
                     <p className="text-base font-black text-gray-900">
-                      {item.price.toLocaleString("ko-KR")}원
+                      {item.price.toLocaleString("ko-KR")}P
                     </p>
                     {!affordable && (
                       <p className="text-[11px] text-red-400 font-bold mt-0.5">잔액이 부족해요</p>
@@ -255,7 +255,7 @@ function OrderCard({
           <span className={`inline-block px-2.5 py-1 rounded-full text-[11px] font-bold ${meta.cls}`}>
             {meta.label}
           </span>
-          <p className="text-sm font-black text-gray-900 mt-1">{order.price.toLocaleString("ko-KR")}원</p>
+          <p className="text-sm font-black text-gray-900 mt-1">{order.price.toLocaleString("ko-KR")}P</p>
         </div>
       </div>
 
@@ -336,18 +336,18 @@ function BuyConfirmSheet({
           </div>
           <p className="text-sm text-gray-400 font-bold">{item.brand}</p>
           <p className="text-lg font-bold text-gray-900">{item.productName}</p>
-          <p className="text-2xl font-black text-gray-900 mt-2">{item.price.toLocaleString("ko-KR")}원</p>
+          <p className="text-2xl font-black text-gray-900 mt-2">{item.price.toLocaleString("ko-KR")}P</p>
         </div>
 
         <div className="bg-gray-50 rounded-[16px] p-4 mt-3 space-y-2">
           <div className="flex justify-between text-sm">
             <span className="text-gray-500">지금 잔액</span>
-            <span className="font-bold text-gray-900">{balance.toLocaleString("ko-KR")}원</span>
+            <span className="font-bold text-gray-900">{balance.toLocaleString("ko-KR")}P</span>
           </div>
           <div className="flex justify-between text-sm">
             <span className="text-gray-500">구매 후 잔액</span>
             <span className={`font-bold ${affordable ? "text-gray-900" : "text-red-500"}`}>
-              {after.toLocaleString("ko-KR")}원
+              {after.toLocaleString("ko-KR")}P
             </span>
           </div>
         </div>
@@ -360,7 +360,7 @@ function BuyConfirmSheet({
             data-testid="btn-confirm-buy"
           >
             {busy ? <Loader2 className="w-5 h-5 animate-spin" /> : null}
-            {item.price.toLocaleString("ko-KR")}원에 구매하기
+            {item.price.toLocaleString("ko-KR")}P에 구매하기
           </button>
         ) : (
           <div className="mt-5 w-full h-[52px] bg-gray-100 text-gray-400 rounded-[16px] font-bold text-base flex items-center justify-center">
@@ -368,7 +368,7 @@ function BuyConfirmSheet({
           </div>
         )}
         <p className="text-center text-xs text-gray-400 mt-3 leading-relaxed">
-          구매하면 잔액이 바로 차감돼요.<br />운영자가 확인 후 기프티콘을 발급해드려요.
+          구매하면 잔액이 바로 차감돼요.<br />부모님이 확인 후 기프티콘을 보내주실 거예요.
         </p>
       </motion.div>
     </>

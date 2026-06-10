@@ -4,6 +4,7 @@ import { X, Wallet, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { useAppContext } from "@/context/AppContext";
+import { POINTS_PER_KRW } from "@/lib/utils";
 
 interface ParentTopupModalProps {
   open: boolean;
@@ -105,7 +106,7 @@ export function ParentTopupModal({ open, onClose }: ParentTopupModalProps) {
                       <div>
                         <p className="text-xs text-blue-600 font-bold">현재 예산 잔액</p>
                         <p className="font-black text-blue-800 text-lg">
-                          ₩{(parent?.balance ?? 0).toLocaleString("ko-KR")}
+                          {(parent?.balance ?? 0).toLocaleString("ko-KR")}P
                         </p>
                       </div>
                     </div>
@@ -125,6 +126,12 @@ export function ParentTopupModal({ open, onClose }: ParentTopupModalProps) {
                       />
                       <span className="absolute right-5 top-1/2 -translate-y-1/2 text-xl font-bold text-gray-400">원</span>
                     </div>
+
+                    {isValid && (
+                      <p className="text-xs text-blue-500 font-bold mb-3 text-right">
+                        충전하면 {(numAmount * POINTS_PER_KRW).toLocaleString("ko-KR")}P가 적립돼요
+                      </p>
+                    )}
 
                     {amount && numAmount < 1000 && (
                       <p className="text-xs text-red-400 font-medium mb-3 text-right">
@@ -168,6 +175,9 @@ export function ParentTopupModal({ open, onClose }: ParentTopupModalProps) {
                       <p className="text-sm text-gray-500 mb-1">충전 금액</p>
                       <p className="text-3xl font-black text-gray-900">
                         +{numAmount.toLocaleString("ko-KR")}원
+                      </p>
+                      <p className="text-sm font-bold text-blue-500 mt-1">
+                        {(numAmount * POINTS_PER_KRW).toLocaleString("ko-KR")}P 적립
                       </p>
                     </div>
 

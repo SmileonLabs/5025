@@ -7,3 +7,4 @@ export * from "./missionLogs";
 export * from "./requests";
 export * from "./pushSubscriptions";
 export * from "./gifticonOrders";
+export * from "./gifticonCatalogItems";

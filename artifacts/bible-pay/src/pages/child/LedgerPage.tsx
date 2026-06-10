@@ -88,7 +88,7 @@ export default function LedgerPage() {
         <div className="text-center mb-6">
           <p className="text-sm text-gray-400 font-medium mb-1">현재 잔액</p>
           <h2 className="text-4xl font-black text-gray-900">
-            ₩{currentChild.balance.toLocaleString("ko-KR")}
+            {currentChild.balance.toLocaleString("ko-KR")}P
           </h2>
         </div>
 
@@ -99,7 +99,7 @@ export default function LedgerPage() {
             </div>
             <div>
               <p className="text-[11px] text-emerald-600 font-bold">총 번 돈</p>
-              <p className="font-black text-emerald-700 text-sm">+{totalEarned.toLocaleString("ko-KR")}원</p>
+              <p className="font-black text-emerald-700 text-sm">+{totalEarned.toLocaleString("ko-KR")}P</p>
             </div>
           </div>
           <div className="flex-1 bg-red-50 rounded-[18px] p-4 flex items-center gap-3">
@@ -108,7 +108,7 @@ export default function LedgerPage() {
             </div>
             <div>
               <p className="text-[11px] text-red-500 font-bold">총 쓴 돈</p>
-              <p className="font-black text-red-600 text-sm">-{totalSpent.toLocaleString("ko-KR")}원</p>
+              <p className="font-black text-red-600 text-sm">-{totalSpent.toLocaleString("ko-KR")}P</p>
             </div>
           </div>
         </div>
@@ -154,7 +154,7 @@ export default function LedgerPage() {
                     <div className="flex-1 min-w-0">
                       <div className="flex justify-between items-center mb-1">
                         <span className="text-sm font-bold text-gray-700 truncate">{label}</span>
-                        <span className="text-sm font-black text-gray-900 whitespace-nowrap ml-2">{total.toLocaleString("ko-KR")}원</span>
+                        <span className="text-sm font-black text-gray-900 whitespace-nowrap ml-2">{total.toLocaleString("ko-KR")}P</span>
                       </div>
                       <div className="h-2 w-full bg-gray-100 rounded-full overflow-hidden">
                         <div className="h-full bg-red-300 rounded-full" style={{ width: `${pct}%` }} />
@@ -193,8 +193,8 @@ export default function LedgerPage() {
                   <div className="flex-1 h-px bg-gray-100" />
                   <span className="text-xs text-gray-300 font-medium">
                     {items.reduce((s, t) => s + t.amount, 0) >= 0
-                      ? `+${items.reduce((s, t) => s + t.amount, 0).toLocaleString("ko-KR")}원`
-                      : `${items.reduce((s, t) => s + t.amount, 0).toLocaleString("ko-KR")}원`}
+                      ? `+${items.reduce((s, t) => s + t.amount, 0).toLocaleString("ko-KR")}P`
+                      : `${items.reduce((s, t) => s + t.amount, 0).toLocaleString("ko-KR")}P`}
                   </span>
                 </div>
 

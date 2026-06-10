@@ -277,7 +277,7 @@ export default function QuizPage() {
                   data-testid="btn-submit-reflection"
                 >
                   {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
-                  {submitting ? "지급 중..." : `작성 완료하고 +${reward.toLocaleString("ko-KR")}원 받기 💰`}
+                  {submitting ? "지급 중..." : `작성 완료하고 +${reward.toLocaleString("ko-KR")}P 받기 💰`}
                 </Button>
               </div>
             </motion.div>
@@ -314,7 +314,7 @@ export default function QuizPage() {
                       transition={{ delay: 0.7 }}
                       className="inline-block bg-gradient-to-r from-yellow-400 to-accent px-6 py-3 rounded-full mt-2 shadow-md"
                     >
-                      <p className="text-white font-black text-lg">+{reward.toLocaleString("ko-KR")}원 지급! 💰</p>
+                      <p className="text-white font-black text-lg">+{reward.toLocaleString("ko-KR")}P 지급! 💰</p>
                     </motion.div>
                   </div>
                   {finalBalance !== null && (
@@ -322,7 +322,7 @@ export default function QuizPage() {
                       <Star className="w-5 h-5 text-yellow-400 fill-yellow-400" />
                       <p className="text-sm font-bold text-gray-700">
                         현재 잔액:{" "}
-                        <span className="text-primary-foreground font-black">₩{finalBalance.toLocaleString("ko-KR")}</span>
+                        <span className="text-primary-foreground font-black">{finalBalance.toLocaleString("ko-KR")}P</span>
                       </p>
                     </div>
                   )}

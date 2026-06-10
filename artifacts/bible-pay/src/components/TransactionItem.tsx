@@ -55,7 +55,7 @@ export function TransactionItem({ description, amount, date, type, category, onC
       </div>
 
       <div className={`font-black text-base whitespace-nowrap tabular-nums ${isPositive ? "text-emerald-500" : "text-red-500"}`}>
-        {isPositive ? "+" : ""}{amount.toLocaleString("ko-KR")}원
+        {isPositive ? "+" : ""}{amount.toLocaleString("ko-KR")}P
       </div>
 
       {clickable && <ChevronRight className="w-4 h-4 text-gray-300 flex-shrink-0" />}

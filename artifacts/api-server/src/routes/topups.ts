@@ -3,7 +3,7 @@ import { z } from "zod/v4";
 import { eq } from "drizzle-orm";
 import { db, parentsTable } from "@workspace/db";
 import { getUncachableStripeClient } from "../stripeClient";
-import { creditBudgetTopup, TOPUP_KIND } from "../topupCredit";
+import { creditBudgetTopup, TOPUP_KIND, POINTS_PER_KRW } from "../topupCredit";
 
 const router: IRouter = Router();
 
@@ -119,7 +119,14 @@ router.post("/topups/confirm", async (req, res) => {
       .where(eq(parentsTable.id, parentId))
       .limit(1);
 
-    res.json({ credited, amount, balance: parent?.balance ?? 0 });
+    // `paidAmount` is the KRW charged; `creditedPoints` is what landed in the
+    // balance (KRW × POINTS_PER_KRW). The balance is always in points.
+    res.json({
+      credited,
+      paidAmount: amount,
+      creditedPoints: amount * POINTS_PER_KRW,
+      balance: parent?.balance ?? 0,
+    });
   } catch (err) {
     req.log.error({ err }, "Failed to confirm topup");
     res.status(502).json({ error: "결제 확인에 실패했어요." });

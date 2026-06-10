@@ -33,7 +33,7 @@ export default function ChargePage() {
       const childName = children.find(c => c.id === selectedChildId)?.name ?? "";
       toast({
         title: "용돈 채우기 완료! 💸",
-        description: `${childName}에게 ${numAmount.toLocaleString("ko-KR")}원을 보냈어요!`,
+        description: `${childName}에게 ${numAmount.toLocaleString("ko-KR")}P를 보냈어요!`,
       });
       setTimeout(() => setLocation("/parent/dashboard"), 1500);
     } catch (err: any) {
@@ -73,7 +73,7 @@ export default function ChargePage() {
           </div>
           <div>
             <p className="text-xs text-gray-500 font-medium">현재 용돈 예산</p>
-            <p className="font-black text-gray-900 text-lg">₩{parent.balance.toLocaleString("ko-KR")}</p>
+            <p className="font-black text-gray-900 text-lg">{parent.balance.toLocaleString("ko-KR")}P</p>
           </div>
         </div>
 
@@ -103,7 +103,7 @@ export default function ChargePage() {
                     <span className={`font-bold ${selectedChildId === child.id ? "text-primary-foreground" : "text-gray-600"}`}>
                       {child.name}
                     </span>
-                    <span className="text-xs text-gray-400">{child.balance.toLocaleString("ko-KR")}원</span>
+                    <span className="text-xs text-gray-400">{child.balance.toLocaleString("ko-KR")}P</span>
                   </button>
                 ))}
               </div>
@@ -120,7 +120,7 @@ export default function ChargePage() {
                   className="text-right text-3xl font-bold h-[72px] rounded-[20px] pr-12 focus-visible:ring-primary border-gray-200"
                   data-testid="input-amount"
                 />
-                <span className="absolute right-5 top-1/2 -translate-y-1/2 text-xl font-bold text-gray-400">원</span>
+                <span className="absolute right-5 top-1/2 -translate-y-1/2 text-xl font-bold text-gray-400">P</span>
               </div>
 
               <div className="flex flex-wrap gap-2">
@@ -131,7 +131,7 @@ export default function ChargePage() {
                     className="px-4 py-2 bg-gray-50 hover:bg-gray-100 rounded-full text-sm font-bold text-gray-700 transition-colors"
                     data-testid={`preset-${preset}`}
                   >
-                    +{preset.toLocaleString("ko-KR")}원
+                    +{preset.toLocaleString("ko-KR")}P
                   </button>
                 ))}
               </div>
