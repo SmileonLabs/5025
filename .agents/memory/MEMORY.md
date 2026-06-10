@@ -4,3 +4,4 @@
 - [bible-pay web push](bible-pay-web-push.md) — VAPID+SW push; devOptions must stay enabled for dev SW, custom SW needs separate webworker tsconfig, transient register error after dep changes.
 - [bible-pay transactions authz](bible-pay-transactions-authz.md) — POST /transactions enforces type-driven rules: mission rejected, charge parent-only+funded, spend negative-only; prevents child self-credit.
 - [bible-pay branding & assets](bible-pay-branding-assets.md) — name is "5025"; no png module decl so reference images via public/ + import.meta.env.BASE_URL; og:image must be absolute.
+- [bible-pay PWA icon & splash](bible-pay-pwa-icon-splash.md) — native home-screen icon can't update post-install (OS limit); content + in-app splash auto-update via SW.

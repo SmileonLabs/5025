@@ -1,9 +1,12 @@
+import { useEffect, useState } from "react";
 import { Switch, Route, Router as WouterRouter } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { AnimatePresence } from "framer-motion";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
 import { AppProvider } from "@/context/AppContext";
+import { SplashScreen } from "@/components/SplashScreen";
 
 import LoginPage from "@/pages/LoginPage";
 import ParentAuthPage from "@/pages/ParentAuthPage";
@@ -48,6 +51,15 @@ function Router() {
 }
 
 function App() {
+  const [booting, setBooting] = useState(true);
+
+  useEffect(() => {
+    // Remove the instant static splash baked into index.html once React owns the UI.
+    document.getElementById("app-splash")?.remove();
+    const timer = setTimeout(() => setBooting(false), 1300);
+    return () => clearTimeout(timer);
+  }, []);
+
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
@@ -57,6 +69,7 @@ function App() {
           </WouterRouter>
         </AppProvider>
         <Toaster />
+        <AnimatePresence>{booting && <SplashScreen />}</AnimatePresence>
       </TooltipProvider>
     </QueryClientProvider>
   );
