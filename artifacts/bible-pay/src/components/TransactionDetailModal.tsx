@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, BookOpen, Coins, ShoppingBag, CheckCircle2, PenLine, Loader2, Clock } from "lucide-react";
+import { X, BookOpen, Coins, ShoppingBag, Gift, RotateCcw, CheckCircle2, PenLine, Loader2, Clock } from "lucide-react";
 import { api } from "@/lib/api";
 import { TransactionType } from "@/context/AppContext";
 import { categoryEmoji } from "@/lib/spendCategories";
@@ -31,6 +31,8 @@ const TYPE_CONFIG: Record<TransactionType, { icon: React.ComponentType<{ classNa
   mission: { icon: BookOpen, bgClass: "bg-green-50", iconClass: "text-green-600", label: "미션 보상" },
   charge: { icon: Coins, bgClass: "bg-blue-50", iconClass: "text-blue-500", label: "용돈 충전" },
   spend: { icon: ShoppingBag, bgClass: "bg-red-50", iconClass: "text-red-400", label: "용돈 사용" },
+  gifticon: { icon: Gift, bgClass: "bg-purple-50", iconClass: "text-purple-500", label: "기프티콘 구매" },
+  refund: { icon: RotateCcw, bgClass: "bg-teal-50", iconClass: "text-teal-500", label: "기프티콘 환불" },
 };
 
 const STATUS_LABEL: Record<MissionResult["status"], string> = {

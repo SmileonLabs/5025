@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { Home, Star, BookOpen, Settings } from "lucide-react";
+import { Home, Star, Gift, BookOpen, Settings } from "lucide-react";
 
 export function BottomNav() {
   const [location] = useLocation();
@@ -7,7 +7,8 @@ export function BottomNav() {
   const navItems = [
     { href: "/child/home", label: "홈", icon: Home },
     { href: "/child/missions", label: "미션", icon: Star },
-    { href: "/child/ledger", label: "용돈기입장", icon: BookOpen },
+    { href: "/child/shop", label: "상점", icon: Gift },
+    { href: "/child/ledger", label: "기입장", icon: BookOpen },
     { href: "/child/settings", label: "설정", icon: Settings }
   ];
 

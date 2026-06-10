@@ -20,7 +20,7 @@ export interface ChildData {
   parentId: number;
 }
 
-export type TransactionType = "mission" | "charge" | "spend";
+export type TransactionType = "mission" | "charge" | "spend" | "gifticon" | "refund";
 
 export interface Transaction {
   id: number;
@@ -62,6 +62,41 @@ export interface PendingLog {
   requestedAt: string;
   mission: { id: number; title: string; reward: number; type: string };
   child: { id: number; name: string; avatar: string };
+}
+
+export interface GifticonCatalogItem {
+  id: string;
+  brand: string;
+  productName: string;
+  faceValue: number;
+  price: number;
+  emoji: string;
+}
+
+export type GifticonStatus = "requested" | "fulfilled" | "rejected" | "canceled";
+
+export interface GifticonOrder {
+  id: number;
+  childId: number;
+  parentId: number;
+  catalogItemId: string;
+  brand: string;
+  productName: string;
+  faceValue: number;
+  price: number;
+  emoji: string;
+  status: GifticonStatus;
+  rejectReason: string | null;
+  fulfilledAt: string | null;
+  createdAt: string;
+}
+
+export interface GifticonOrderDetail extends GifticonOrder {
+  issuedPin: string | null;
+  issuedBarcode: string | null;
+  issuedImageUrl: string | null;
+  transactionId: number | null;
+  refundTransactionId: number | null;
 }
 
 interface AppState {
@@ -106,6 +141,14 @@ interface AppState {
   createRequest: (type: ChildRequest["type"], message: string) => Promise<void>;
   refreshRequests: () => Promise<void>;
   resolveRequest: (id: number, status: "resolved" | "dismissed") => Promise<void>;
+  // Gifticon shop (child)
+  gifticonCatalog: GifticonCatalogItem[];
+  gifticonOrders: GifticonOrder[];
+  refreshGifticonCatalog: () => Promise<void>;
+  refreshGifticonOrders: () => Promise<void>;
+  buyGifticon: (catalogItemId: string) => Promise<void>;
+  cancelGifticonOrder: (orderId: number) => Promise<void>;
+  getGifticonOrderDetail: (orderId: number) => Promise<GifticonOrderDetail>;
 }
 
 const AppContext = createContext<AppState | undefined>(undefined);
@@ -121,6 +164,8 @@ export function AppProvider({ children: reactChildren }: { children: ReactNode }
   const [missions, setMissions] = useState<Mission[]>([]);
   const [pendingLogs, setPendingLogs] = useState<PendingLog[]>([]);
   const [childRequests, setChildRequests] = useState<ChildRequest[]>([]);
+  const [gifticonCatalog, setGifticonCatalog] = useState<GifticonCatalogItem[]>([]);
+  const [gifticonOrders, setGifticonOrders] = useState<GifticonOrder[]>([]);
 
   const refreshChildren = useCallback(async () => {
     try {
@@ -157,6 +202,20 @@ export function AppProvider({ children: reactChildren }: { children: ReactNode }
     } catch {}
   }, []);
 
+  const refreshGifticonCatalog = useCallback(async () => {
+    try {
+      const data = await api.get<GifticonCatalogItem[]>("/gifticons/catalog");
+      setGifticonCatalog(data);
+    } catch {}
+  }, []);
+
+  const refreshGifticonOrders = useCallback(async () => {
+    try {
+      const data = await api.get<GifticonOrder[]>("/gifticons/orders");
+      setGifticonOrders(data);
+    } catch {}
+  }, []);
+
   // Restore session on mount
   useEffect(() => {
     (async () => {
@@ -180,12 +239,16 @@ export function AppProvider({ children: reactChildren }: { children: ReactNode }
         } else if (me.role === "child") {
           setRole("child");
           setCurrentChild({ id: me.id, name: me.name, age: me.age, avatar: me.avatar, balance: me.balance, parentId: me.parentId });
-          const [txs, missionList] = await Promise.all([
+          const [txs, missionList, catalog, orders] = await Promise.all([
             api.get<Transaction[]>("/transactions"),
             api.get<Mission[]>("/missions"),
+            api.get<GifticonCatalogItem[]>("/gifticons/catalog"),
+            api.get<GifticonOrder[]>("/gifticons/orders"),
           ]);
           setTransactions(txs);
           setMissions(missionList);
+          setGifticonCatalog(catalog);
+          setGifticonOrders(orders);
         }
       } catch {
         // not logged in
@@ -237,6 +300,8 @@ export function AppProvider({ children: reactChildren }: { children: ReactNode }
     setMissions([]);
     setPendingLogs([]);
     setChildRequests([]);
+    setGifticonCatalog([]);
+    setGifticonOrders([]);
   };
 
   const childLogin = async (childId: number, pin: string) => {
@@ -245,12 +310,16 @@ export function AppProvider({ children: reactChildren }: { children: ReactNode }
     setRole("child");
     setParent(null);
     setChildren([]);
-    const [txs, missionList] = await Promise.all([
+    const [txs, missionList, catalog, orders] = await Promise.all([
       api.get<Transaction[]>("/transactions"),
       api.get<Mission[]>("/missions"),
+      api.get<GifticonCatalogItem[]>("/gifticons/catalog"),
+      api.get<GifticonOrder[]>("/gifticons/orders"),
     ]);
     setTransactions(txs);
     setMissions(missionList);
+    setGifticonCatalog(catalog);
+    setGifticonOrders(orders);
   };
 
   const createChild = async (name: string, age: number, avatar: string, pin: string) => {
@@ -457,6 +526,38 @@ export function AppProvider({ children: reactChildren }: { children: ReactNode }
     setChildRequests(prev => prev.filter(r => r.id !== id));
   };
 
+  const buyGifticon = async (catalogItemId: string) => {
+    const result = await api.post<{ order: GifticonOrder; childBalance: number }>(
+      "/gifticons/orders",
+      { catalogItemId },
+    );
+    setCurrentChild(prev => prev ? { ...prev, balance: result.childBalance } : prev);
+    const [txs, orders] = await Promise.all([
+      api.get<Transaction[]>("/transactions"),
+      api.get<GifticonOrder[]>("/gifticons/orders"),
+    ]);
+    setTransactions(txs);
+    setGifticonOrders(orders);
+  };
+
+  const cancelGifticonOrder = async (orderId: number) => {
+    const result = await api.post<{ order: GifticonOrder; childBalance: number }>(
+      `/gifticons/orders/${orderId}/cancel`,
+      {},
+    );
+    setCurrentChild(prev => prev ? { ...prev, balance: result.childBalance } : prev);
+    const [txs, orders] = await Promise.all([
+      api.get<Transaction[]>("/transactions"),
+      api.get<GifticonOrder[]>("/gifticons/orders"),
+    ]);
+    setTransactions(txs);
+    setGifticonOrders(orders);
+  };
+
+  const getGifticonOrderDetail = async (orderId: number) => {
+    return api.get<GifticonOrderDetail>(`/gifticons/orders/${orderId}`);
+  };
+
   return (
     <AppContext.Provider value={{
       role, loading, parent, currentChild, children, transactions, parentTransactions, missions, pendingLogs, childRequests,
@@ -468,6 +569,8 @@ export function AppProvider({ children: reactChildren }: { children: ReactNode }
       refreshPendingLogs, approveMissionLog, rejectMissionLog,
       chargeAllowance, spendAllowance, refreshParentTransactions,
       createRequest, refreshRequests, resolveRequest,
+      gifticonCatalog, gifticonOrders, refreshGifticonCatalog, refreshGifticonOrders,
+      buyGifticon, cancelGifticonOrder, getGifticonOrderDetail,
     }}>
       {reactChildren}
     </AppContext.Provider>

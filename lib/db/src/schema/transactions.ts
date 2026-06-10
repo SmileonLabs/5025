@@ -8,7 +8,7 @@ export const transactionsTable = pgTable("transactions", {
   childId: integer("child_id").notNull().references(() => childrenTable.id, { onDelete: "cascade" }),
   amount: integer("amount").notNull(),
   description: text("description").notNull(),
-  type: text("type").notNull().$type<"mission" | "charge" | "spend">(),
+  type: text("type").notNull().$type<"mission" | "charge" | "spend" | "gifticon" | "refund">(),
   category: text("category"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });

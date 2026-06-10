@@ -1,4 +1,4 @@
-import { BookOpen, Coins, ShoppingBag, ChevronRight } from "lucide-react";
+import { BookOpen, Coins, ShoppingBag, ChevronRight, Gift, RotateCcw } from "lucide-react";
 import { TransactionType } from "@/context/AppContext";
 import { categoryEmoji } from "@/lib/spendCategories";
 
@@ -15,6 +15,8 @@ const TYPE_CONFIG: Record<TransactionType, { icon: React.ComponentType<{ classNa
   mission: { icon: BookOpen, bgClass: "bg-green-50", iconClass: "text-green-600", emoji: "📖" },
   charge:  { icon: Coins,    bgClass: "bg-blue-50",  iconClass: "text-blue-500",  emoji: "💰" },
   spend:   { icon: ShoppingBag, bgClass: "bg-red-50", iconClass: "text-red-400", emoji: "🛍️" },
+  gifticon: { icon: Gift,    bgClass: "bg-purple-50", iconClass: "text-purple-500", emoji: "🎁" },
+  refund:  { icon: RotateCcw, bgClass: "bg-teal-50", iconClass: "text-teal-500", emoji: "↩️" },
 };
 
 function formatDate(dateStr: string): string {

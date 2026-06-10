@@ -21,6 +21,8 @@ import LedgerPage from "@/pages/child/LedgerPage";
 import SettingsPage from "@/pages/child/SettingsPage";
 import BibleChapterPage from "@/pages/child/BibleChapterPage";
 import QuizPage from "@/pages/child/QuizPage";
+import ShopPage from "@/pages/child/ShopPage";
+import AdminPage from "@/pages/AdminPage";
 
 const queryClient = new QueryClient();
 
@@ -40,10 +42,13 @@ function Router() {
 
       <Route path="/child/home" component={HomePage} />
       <Route path="/child/missions" component={MissionsPage} />
+      <Route path="/child/shop" component={ShopPage} />
       <Route path="/child/ledger" component={LedgerPage} />
       <Route path="/child/settings" component={SettingsPage} />
       <Route path="/child/bible/:missionId" component={BibleChapterPage} />
       <Route path="/child/quiz/:missionId" component={QuizPage} />
+
+      <Route path="/admin" component={AdminPage} />
 
       <Route component={NotFound} />
     </Switch>

@@ -8,6 +8,8 @@ import missionsRouter from "./missions";
 import requestsRouter from "./requests";
 import pushRouter from "./push";
 import topupsRouter from "./topups";
+import gifticonsRouter from "./gifticons";
+import adminRouter from "./admin";
 
 const router: IRouter = Router();
 
@@ -20,5 +22,7 @@ router.use(missionsRouter);
 router.use(requestsRouter);
 router.use(pushRouter);
 router.use(topupsRouter);
+router.use(gifticonsRouter);
+router.use(adminRouter);
 
 export default router;
