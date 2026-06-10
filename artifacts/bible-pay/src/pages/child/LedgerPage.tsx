@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useAppContext, Transaction } from "@/context/AppContext";
 import { BottomNav } from "@/components/BottomNav";
 import { TransactionItem } from "@/components/TransactionItem";
+import { TransactionDetailModal } from "@/components/TransactionDetailModal";
 import { SpendModal } from "@/components/SpendModal";
 import { categoryEmoji } from "@/lib/spendCategories";
 
@@ -46,6 +47,7 @@ export default function LedgerPage() {
   const { currentChild, transactions } = useAppContext();
   const [filter, setFilter] = useState<Filter>(initialFilter);
   const [spendOpen, setSpendOpen] = useState(false);
+  const [detailTxId, setDetailTxId] = useState<number | null>(null);
 
   React.useEffect(() => {
     if (!currentChild) setLocation("/login");
@@ -205,6 +207,7 @@ export default function LedgerPage() {
                       date={tx.createdAt}
                       type={tx.type}
                       category={tx.category}
+                      onClick={() => setDetailTxId(tx.id)}
                     />
                   ))}
                 </div>
@@ -221,6 +224,12 @@ export default function LedgerPage() {
         onClose={() => setSpendOpen(false)}
         childId={currentChild.id}
         balance={currentChild.balance}
+      />
+
+      <TransactionDetailModal
+        transactionId={detailTxId}
+        open={detailTxId !== null}
+        onClose={() => setDetailTxId(null)}
       />
     </div>
   );

@@ -3,6 +3,7 @@ import { useLocation } from "wouter";
 import { ChevronLeft } from "lucide-react";
 import { useAppContext, Transaction } from "@/context/AppContext";
 import { TransactionItem } from "@/components/TransactionItem";
+import { TransactionDetailModal } from "@/components/TransactionDetailModal";
 
 type Filter = "전체" | "미션" | "충전" | "사용";
 
@@ -31,6 +32,7 @@ export default function HistoryPage() {
   const [_, setLocation] = useLocation();
   const { parent, parentTransactions, children, refreshParentTransactions } = useAppContext();
   const [filter, setFilter] = useState<Filter>("전체");
+  const [detailTxId, setDetailTxId] = useState<number | null>(null);
 
   useEffect(() => {
     if (!parent) {
@@ -100,6 +102,7 @@ export default function HistoryPage() {
                     date={tx.createdAt}
                     type={tx.type}
                     category={tx.category}
+                    onClick={() => setDetailTxId(tx.id)}
                   />
                 ))}
               </div>
@@ -107,6 +110,13 @@ export default function HistoryPage() {
           ))
         )}
       </div>
+
+      <TransactionDetailModal
+        transactionId={detailTxId}
+        open={detailTxId !== null}
+        onClose={() => setDetailTxId(null)}
+        showChild
+      />
     </div>
   );
 }

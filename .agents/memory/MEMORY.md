@@ -1,7 +1,1 @@
-- [bible-pay parent vs child state](bible-pay-state-scoping.md) — parent dashboard must read parentTransactions (not child-scoped transactions); /transactions/all powers it.
-- [bible-pay DB push](bible-pay-db-push.md) — drizzle-kit push hangs on non-TTY; apply additive schema via executeSql instead.
-- [bible-pay lib typecheck](bible-pay-lib-typecheck.md) — integrations-openai libs have pre-existing missing-deps errors that block typecheck:libs and api-server typecheck; runtime is fine via esbuild.
-- [bible-pay web push](bible-pay-web-push.md) — VAPID+SW push; devOptions must stay enabled for dev SW, custom SW needs separate webworker tsconfig, transient register error after dep changes.
-- [bible-pay transactions authz](bible-pay-transactions-authz.md) — POST /transactions enforces type-driven rules: mission rejected, charge parent-only+funded, spend negative-only; prevents child self-credit.
-- [bible-pay branding & assets](bible-pay-branding-assets.md) — name is "5025"; no png module decl so reference images via public/ + import.meta.env.BASE_URL; og:image must be absolute.
-- [bible-pay PWA icon & splash](bible-pay-pwa-icon-splash.md) — native home-screen icon can't update post-install (OS limit); content + in-app splash auto-update via SW.
+- [bible-pay mission result in transactions](bible-pay-mission-result.md) — mission result lives in mission_logs (join on transaction_id), not on the transaction; legacy rows may have null reflection.
