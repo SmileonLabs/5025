@@ -34,7 +34,7 @@ _Describe the high-level user-facing capabilities of this app once they exist._
 
 ## User preferences
 
-- Always communicate with the user in Korean (한국어). This applies to all chat replies.
+- Always communicate with the user in Korean (한국어). This applies to all chat replies AND internal reasoning/thinking.
 
 ## Gotchas
 
