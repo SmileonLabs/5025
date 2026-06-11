@@ -271,10 +271,17 @@ function MissionCreateModal({ onClose }: { onClose: () => void }) {
 
 function PendingCard({ log, onApprove, onReject }: { log: PendingLog; onApprove: () => void; onReject: () => void }) {
   const [loading, setLoading] = useState(false);
+  const { toast } = useToast();
 
   const approve = async () => {
     setLoading(true);
-    try { await onApprove(); } finally { setLoading(false); }
+    try {
+      await onApprove();
+    } catch (err: any) {
+      toast({ title: err?.message ?? "승인에 실패했어요.", variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
   };
   const reject = async () => {
     setLoading(true);

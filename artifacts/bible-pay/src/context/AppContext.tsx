@@ -457,8 +457,12 @@ export function AppProvider({ children: reactChildren }: { children: ReactNode }
   };
 
   const approveMissionLog = async (logId: number) => {
-    await api.post<{ childBalance: number }>(`/mission-logs/${logId}/approve`, {});
+    const result = await api.post<{ childBalance: number; parentBalance: number }>(`/mission-logs/${logId}/approve`, {});
     setPendingLogs(prev => prev.filter(l => l.id !== logId));
+    // 닫힌 용돈 구조: 승인 시 부모 잔액이 차감되므로 부모 상태도 갱신한다.
+    if (typeof result.parentBalance === "number") {
+      setParent(prev => prev ? { ...prev, balance: result.parentBalance } : prev);
+    }
     // Refresh children to show updated balance
     await refreshChildren();
     await refreshMissionLogs();

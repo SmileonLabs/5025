@@ -3,6 +3,7 @@ import { z } from "zod";
 import { db, missionsTable, missionLogsTable, missionAssignmentsTable, childrenTable, transactionsTable } from "@workspace/db";
 import { eq, and, desc, inArray, sql, or, exists } from "drizzle-orm";
 import { sendPushToParent } from "../lib/push";
+import { grantBibleReward, approveActivityLog } from "../lib/missionReward";
 
 const router = Router();
 
@@ -370,25 +371,39 @@ router.post("/missions/:id/submit", requireChild, async (req, res) => {
     if (dup.length > 0) { res.status(409).json({ error: "이미 완료한 장이에요!" }); return; }
   }
 
-  const newBalance = child.balance + mission.reward;
-  await db.update(childrenTable).set({ balance: newBalance }).where(eq(childrenTable.id, childId));
+  // 닫힌 용돈 구조: 보상은 부모 잔액에서 차감되어 아이에게 적립된다(원자적 트랜잭션).
+  const result = await grantBibleReward({
+    parentId: child.parentId,
+    childId,
+    missionId,
+    reward: mission.reward,
+    bibleBook: bibleBook!,
+    bibleChapter: bibleChapter!,
+    reflection: reflection!,
+    quiz,
+    description: `${bibleBook} ${bibleChapter}장 읽기 완료`,
+  });
 
-  const description = mission.type === "bible" && bibleBook && bibleChapter
-    ? `${bibleBook} ${bibleChapter}장 읽기 완료`
-    : `${mission.title} 완료`;
-
-  const [tx] = await db.insert(transactionsTable)
-    .values({ childId, amount: mission.reward, description, type: "mission" }).returning();
-
-  const [log] = await db.insert(missionLogsTable)
-    .values({ missionId, childId, status: "completed", bibleBook, bibleChapter, reflection, quiz: quiz ?? null, transactionId: tx.id }).returning();
+  if (!result.ok) {
+    if (result.reason === "duplicate") {
+      res.status(409).json({ error: "이미 완료한 장이에요!" });
+      return;
+    }
+    // 부모 잔액 부족 → 보상 차단 + 충전 안내(닫힌 구조). 부모에게도 알린다.
+    void sendPushToParent(child.parentId, {
+      title: "⚠️ 미션 보상 지급 실패",
+      body: `${child.name}님이 '${mission.title}' 미션을 완료했지만 포인트가 부족해 보상을 못 줬어요. 충전하면 다시 받을 수 있어요.`,
+    });
+    res.status(402).json({ error: "부모님 포인트가 부족해 지금은 보상을 받을 수 없어요. 부모님께 충전을 부탁해요." });
+    return;
+  }
 
   void sendPushToParent(child.parentId, {
     title: "🎉 미션 완료!",
     body: `${child.name}님이 '${mission.title}' 미션을 완료하고 ${mission.reward.toLocaleString("ko-KR")}P를 받았어요.`,
   });
 
-  res.status(201).json({ log, tx, childBalance: newBalance });
+  res.status(201).json({ log: result.log, tx: result.tx, childBalance: result.childBalance });
 });
 
 // GET /api/missions/pending  (parent)
@@ -470,23 +485,25 @@ router.post("/mission-logs/:logId/approve", requireParent, async (req, res) => {
   const [child] = await db.select().from(childrenTable).where(eq(childrenTable.id, log.childId)).limit(1);
   if (!child) { res.status(404).json({ error: "아이를 찾을 수 없어요." }); return; }
 
-  const newBalance = child.balance + mission.reward;
-  await db.update(childrenTable).set({ balance: newBalance }).where(eq(childrenTable.id, log.childId));
-
-  const [tx] = await db.insert(transactionsTable).values({
+  // 닫힌 용돈 구조: 승인 시 부모 잔액에서 차감되어 아이에게 적립된다(이중승인·잔액부족 안전).
+  const result = await approveActivityLog({
+    logId,
+    parentId: mission.parentId,
     childId: log.childId,
-    amount: mission.reward,
+    reward: mission.reward,
     description: `${mission.title} 완료 (부모 확인)`,
-    type: "mission",
-  }).returning();
+  });
 
-  const [updatedLog] = await db
-    .update(missionLogsTable)
-    .set({ status: "approved", transactionId: tx.id, approvedAt: new Date() })
-    .where(eq(missionLogsTable.id, logId))
-    .returning();
+  if (!result.ok) {
+    if (result.reason === "already_processed") {
+      res.status(409).json({ error: "이미 처리된 미션이에요." });
+      return;
+    }
+    res.status(402).json({ error: "포인트가 부족해요. 충전 후 다시 승인해주세요." });
+    return;
+  }
 
-  res.json({ log: updatedLog, childBalance: newBalance });
+  res.json({ log: result.log, childBalance: result.childBalance, parentBalance: result.parentBalance });
 });
 
 // POST /api/mission-logs/:logId/reject  (parent)
@@ -499,9 +516,13 @@ router.post("/mission-logs/:logId/reject", requireParent, async (req, res) => {
     .where(and(eq(missionsTable.id, log.missionId), eq(missionsTable.parentId, req.session.parentId!))).limit(1);
   if (!mission) { res.status(403).json({ error: "권한이 없어요." }); return; }
 
+  // 조건부 UPDATE(WHERE status='requested')로 동시 approve/reject 경합을 차단한다.
+  // 무조건 덮어쓰면 먼저 커밋된 approve(부모 차감·아이 적립·approved)를 reject가 가려서
+  // 아이가 포인트를 가진 채 로그만 rejected가 되고, rejected는 재도전 허용이라 이중 보상이 가능하다.
   const [updatedLog] = await db
     .update(missionLogsTable).set({ status: "rejected" })
-    .where(eq(missionLogsTable.id, logId)).returning();
+    .where(and(eq(missionLogsTable.id, logId), eq(missionLogsTable.status, "requested"))).returning();
+  if (!updatedLog) { res.status(409).json({ error: "이미 처리된 미션이에요." }); return; }
   res.json({ log: updatedLog });
 });
 
