@@ -20,7 +20,7 @@ export const gifticonOrdersTable = pgTable("gifticon_orders", {
   emoji: text("emoji").notNull().default("🎁"),
   status: text("status")
     .notNull()
-    .$type<"requested" | "fulfilled" | "rejected" | "canceled">()
+    .$type<"requested" | "fulfilled" | "rejected" | "canceled" | "used">()
     .default("requested"),
   // Ledger links (set on the spend/refund rows created server-side).
   transactionId: integer("transaction_id").references(() => transactionsTable.id, {
@@ -35,6 +35,8 @@ export const gifticonOrdersTable = pgTable("gifticon_orders", {
   issuedBarcode: text("issued_barcode"),
   issuedImageUrl: text("issued_image_url"),
   fulfilledAt: timestamp("fulfilled_at", { withTimezone: true }),
+  // Set when the owning child marks the issued gifticon as used (terminal).
+  usedAt: timestamp("used_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

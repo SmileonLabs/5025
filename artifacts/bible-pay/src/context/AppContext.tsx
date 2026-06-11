@@ -102,7 +102,7 @@ export interface GifticonCatalogItem {
   createdAt: string;
 }
 
-export type GifticonStatus = "requested" | "fulfilled" | "rejected" | "canceled";
+export type GifticonStatus = "requested" | "fulfilled" | "rejected" | "canceled" | "used";
 
 export interface GifticonOrder {
   id: number;
@@ -117,6 +117,7 @@ export interface GifticonOrder {
   status: GifticonStatus;
   rejectReason: string | null;
   fulfilledAt: string | null;
+  usedAt: string | null;
   createdAt: string;
   // Present only on the parent-scoped list (joined from the child row).
   childName?: string;
@@ -181,6 +182,7 @@ interface AppState {
   buyGifticon: (catalogItemId: string, amount?: number) => Promise<void>;
   cancelGifticonOrder: (orderId: number) => Promise<void>;
   getGifticonOrderDetail: (orderId: number) => Promise<GifticonOrderDetail>;
+  markGifticonUsed: (orderId: number) => Promise<void>;
   // Gifticon catalog management (parent)
   createGifticonCatalogItem: (data: { brand: string; productName: string; price: number; isVariablePrice?: boolean; emoji?: string }) => Promise<void>;
   deleteGifticonCatalogItem: (id: number) => Promise<void>;
@@ -600,6 +602,11 @@ export function AppProvider({ children: reactChildren }: { children: ReactNode }
     return api.get<GifticonOrderDetail>(`/gifticons/orders/${orderId}`);
   };
 
+  const markGifticonUsed = async (orderId: number) => {
+    await api.post<GifticonOrder>(`/gifticons/orders/${orderId}/use`, {});
+    await refreshGifticonOrders();
+  };
+
   const createGifticonCatalogItem = async (data: { brand: string; productName: string; price: number; isVariablePrice?: boolean; emoji?: string }) => {
     await api.post<GifticonCatalogItem>("/gifticons/catalog", data);
     await refreshGifticonCatalog();
@@ -638,7 +645,7 @@ export function AppProvider({ children: reactChildren }: { children: ReactNode }
       chargeAllowance, spendAllowance, refreshParentTransactions,
       createRequest, refreshRequests, resolveRequest,
       gifticonCatalog, gifticonOrders, refreshGifticonCatalog, refreshGifticonOrders,
-      buyGifticon, cancelGifticonOrder, getGifticonOrderDetail,
+      buyGifticon, cancelGifticonOrder, getGifticonOrderDetail, markGifticonUsed,
       createGifticonCatalogItem, deleteGifticonCatalogItem,
       fulfillGifticonOrderByParent, rejectGifticonOrderByParent,
     }}>

@@ -176,3 +176,28 @@ export async function fulfillGifticonOrder(params: {
     .returning();
   return order;
 }
+
+/**
+ * Mark a fulfilled order as used by the owning child. Conditional on
+ * status='fulfilled' AND child_id so a non-owner or a double-use is a no-op
+ * (returns undefined). No balance change — `used` is a terminal state recording
+ * that the child redeemed the gifticon. IDOR-safe via the child_id WHERE clause.
+ */
+export async function markGifticonOrderUsed(params: {
+  orderId: number;
+  childId: number;
+}): Promise<GifticonOrder | undefined> {
+  const { orderId, childId } = params;
+  const [order] = await db
+    .update(gifticonOrdersTable)
+    .set({ status: "used", usedAt: new Date() })
+    .where(
+      and(
+        eq(gifticonOrdersTable.id, orderId),
+        eq(gifticonOrdersTable.childId, childId),
+        eq(gifticonOrdersTable.status, "fulfilled"),
+      ),
+    )
+    .returning();
+  return order;
+}

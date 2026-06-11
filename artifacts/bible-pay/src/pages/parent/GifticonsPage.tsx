@@ -20,6 +20,7 @@ const STATUS_META: Record<GifticonStatus, { label: string; cls: string }> = {
   fulfilled: { label: "발급 완료", cls: "bg-emerald-100 text-emerald-700" },
   rejected: { label: "거절됨", cls: "bg-red-100 text-red-600" },
   canceled: { label: "취소됨", cls: "bg-gray-100 text-gray-500" },
+  used: { label: "사용 완료", cls: "bg-blue-100 text-blue-600" },
 };
 
 export default function ParentGifticonsPage() {

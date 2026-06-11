@@ -29,12 +29,12 @@ _Replace the heading above with the project's name, and this line with one sente
 - 포인트 환산(서버 권위): `artifacts/api-server/src/topupCredit.ts` — `POINTS_PER_KRW`(=10). 충전 라우트는 `routes/topups.ts`.
 - 포인트 표시(프론트): `artifacts/bible-pay/src/lib/utils.ts` — `POINTS_PER_KRW`, `formatPoints()`.
 - 부모 기프티콘 관리 UI: `artifacts/bible-pay/src/pages/parent/GifticonsPage.tsx` (구매요청 발급/거절 + 상품관리 CRUD 탭; 이모지 팔레트 선택 + 금액권 토글). 부모 미션 관리: `pages/parent/MissionsPage.tsx`(미션 생성 모달: bible/activity, daily/once+날짜, 시간제한, 인증샷 토글, **대상 아이 선택**(전체 토글 + children 다중 칩, 아이 0명이면 전체 고정); 목록에 대상 배지(`MissionTargetBadge`); 대기 제출 사진 표시).
-- 아이 상점 UI: `artifacts/bible-pay/src/pages/child/ShopPage.tsx`(금액권은 자유금액 입력 시트). 아이 미션: `components/MissionCard.tsx`(activity 인증샷 업로드+제출). 전역 상태/헬퍼: `src/context/AppContext.tsx`.
+- 아이 상점 UI: `artifacts/bible-pay/src/pages/child/ShopPage.tsx`(금액권은 자유금액 입력 시트; 발급된 기프티콘 DetailSheet에서 "다 썼어요(사용 완료)" 버튼→`markGifticonUsed`, used면 사용일 배지). 용돈 쓰기: `components/SpendModal.tsx`(카테고리 그리드 제거, 직접 입력 용도만; category는 "기타" 고정). 아이 미션: `components/MissionCard.tsx`(activity 인증샷 업로드+제출). 전역 상태/헬퍼: `src/context/AppContext.tsx`.
 
 ## Architecture decisions
 
-- 기프티콘 주문 상태머신: `requested → fulfilled`(운영자 수동 발급), `requested → rejected`(운영자, 환불), `requested → canceled`(아이, 환불). 부모 승인 단계 없음.
-- `fulfilled`는 종결 상태로, 운영자가 핀/바코드를 발급한 뒤에는 환불·되돌리기 경로가 없음(수동 발급 MVP의 의도된 한계). 잘못 발급 시 별도 보상은 수동 처리.
+- 기프티콘 주문 상태머신: `requested → fulfilled`(운영자/부모 발급), `requested → rejected`(운영자/부모, 환불), `requested → canceled`(아이, 환불), `fulfilled → used`(아이, 사용 완료 표시). 부모 승인 단계 없음.
+- `fulfilled` 이후 아이가 `used`(사용 완료)로 전환 가능 — `markGifticonOrderUsed`(조건부 UPDATE `WHERE id AND child_id AND status='fulfilled'` SET `status='used', used_at=now`, POST `/gifticons/orders/:id/use`). `used`는 종결 상태로 되돌리기·환불 경로 없음(불변식: 발급·취소·거절은 모두 `status='requested'` 조건이라 used에서 재진입 불가). 발급 후 핀/바코드 열람은 used 이후에도 가능(상세 엔드포인트 status 필터 없음, UI는 "사용 완료한 기프티콘 보기"). 잘못 발급 시 별도 보상은 수동 처리.
 - 기프티콘 가격은 서버 권위. 고정상품은 클라 `amount` 무시(카탈로그 price 스냅샷). 금액권(`isVariablePrice`)은 클라가 `amount`(포인트) 전송, 서버 `z.int().min(1).max(10_000_000)` 검증 후 주문 행에 스냅샷. catalog price는 NOT NULL 유지, 금액권이면 0 저장(판별자는 `isVariablePrice`).
 - 잔액 차감/환불은 조건부 `UPDATE ... WHERE balance >= price`(차감)와 `WHERE status = 'requested'`(환불/발급)로 원자적 처리 — TOCTOU·이중환불·잔액초과 방지.
 - 발급 비밀값(핀/바코드/이미지URL)은 목록 응답에서 제외, 상세 엔드포인트(소유 아이/부모/운영자 인가)에서만 노출.
@@ -47,7 +47,7 @@ _Replace the heading above with the project's name, and this line with one sente
 한국 아이용 성경-용돈 PWA. 모든 금액 단위는 **포인트(P)**.
 
 - **부모**: 회원가입/로그인, 아이 계정 생성(PIN 4자리), 용돈 충전(Stripe 결제 → 결제 원금 ×10 포인트 적립), 미션 관리(성경읽기 + 활동미션: 매일/지정일·시간제한·인증샷; 대상 아이를 전체 또는 특정 아이 여러 명으로 지정), 활동미션 제출 승인/거절, 기프티콘 상품 카탈로그 등록/삭제(부모별; 이모지 팔레트 선택, 금액권 옵션), 아이 구매요청 발급/거절(거절 시 자동 환불).
-- **아이**: PIN 로그인, 미션 수행(성경 읽기·퀴즈는 즉시 적립, 활동미션은 인증샷 제출→부모 확인)으로 포인트 획득, 상점에서 **자기 부모가 등록한** 기프티콘만 구매(고정가 또는 금액권 자유금액 입력, 구매 즉시 잔액 차감), 발급 전 구매 취소/환불.
+- **아이**: PIN 로그인, 미션 수행(성경 읽기·퀴즈는 즉시 적립, 활동미션은 인증샷 제출→부모 확인)으로 포인트 획득, 상점에서 **자기 부모가 등록한** 기프티콘만 구매(고정가 또는 금액권 자유금액 입력, 구매 즉시 잔액 차감), 발급 전 구매 취소/환불, 발급받은 기프티콘 사용 후 "사용 완료" 표시(사용일 기록).
 - **운영자(admin)**: 부모 발급/거절과 별도로 기프티콘 발급·거절 경로 유지.
 
 ## User preferences

@@ -12,6 +12,7 @@ import {
   createGifticonOrder,
   refundGifticonOrder,
   fulfillGifticonOrder,
+  markGifticonOrderUsed,
 } from "../lib/gifticonCredit";
 import { requireAdmin } from "../lib/adminAuth";
 import { sendPushToParent } from "../lib/push";
@@ -238,6 +239,7 @@ router.get("/gifticons/orders", async (req, res) => {
         status: gifticonOrdersTable.status,
         rejectReason: gifticonOrdersTable.rejectReason,
         fulfilledAt: gifticonOrdersTable.fulfilledAt,
+        usedAt: gifticonOrdersTable.usedAt,
         createdAt: gifticonOrdersTable.createdAt,
         childName: childrenTable.name,
         childAvatar: childrenTable.avatar,
@@ -302,6 +304,29 @@ router.post("/gifticons/orders/:id/cancel", async (req, res) => {
     return;
   }
   res.json({ order: result.order, childBalance: result.childBalance });
+});
+
+// POST /api/gifticons/orders/:id/use — child marks their fulfilled gifticon used
+router.post("/gifticons/orders/:id/use", async (req, res) => {
+  if (!req.session?.childId) {
+    res.status(401).json({ error: "아이 로그인이 필요해요." });
+    return;
+  }
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id)) {
+    res.status(400).json({ error: "잘못된 요청이에요." });
+    return;
+  }
+
+  const order = await markGifticonOrderUsed({
+    orderId: id,
+    childId: req.session.childId,
+  });
+  if (!order) {
+    res.status(409).json({ error: "사용 완료할 수 없는 기프티콘이에요." });
+    return;
+  }
+  res.json(toListItem(order));
 });
 
 // ---- Parent fulfillment / rejection ----
@@ -403,6 +428,7 @@ router.get("/gifticons/admin/orders", requireAdmin, async (_req, res) => {
       issuedBarcode: gifticonOrdersTable.issuedBarcode,
       issuedImageUrl: gifticonOrdersTable.issuedImageUrl,
       fulfilledAt: gifticonOrdersTable.fulfilledAt,
+      usedAt: gifticonOrdersTable.usedAt,
       createdAt: gifticonOrdersTable.createdAt,
       childName: childrenTable.name,
       childAvatar: childrenTable.avatar,

@@ -17,6 +17,7 @@ const STATUS_META: Record<GifticonStatus, { label: string; cls: string }> = {
   fulfilled: { label: "발급 완료", cls: "bg-emerald-100 text-emerald-700" },
   rejected: { label: "거절됨", cls: "bg-red-100 text-red-600" },
   canceled: { label: "취소됨", cls: "bg-gray-100 text-gray-500" },
+  used: { label: "사용 완료", cls: "bg-blue-100 text-blue-600" },
 };
 
 type Tab = "shop" | "mine";
@@ -30,6 +31,7 @@ export default function ShopPage() {
     buyGifticon,
     cancelGifticonOrder,
     getGifticonOrderDetail,
+    markGifticonUsed,
   } = useAppContext();
 
   const [tab, setTab] = useState<Tab>("shop");
@@ -38,6 +40,7 @@ export default function ShopPage() {
   const [cancelingId, setCancelingId] = useState<number | null>(null);
   const [detail, setDetail] = useState<GifticonOrderDetail | null>(null);
   const [detailLoadingId, setDetailLoadingId] = useState<number | null>(null);
+  const [using, setUsing] = useState(false);
 
   React.useEffect(() => {
     if (!currentChild) setLocation("/login");
@@ -87,6 +90,20 @@ export default function ShopPage() {
       toast({ title: message, variant: "destructive" });
     } finally {
       setDetailLoadingId(null);
+    }
+  };
+
+  const handleUse = async (orderId: number) => {
+    setUsing(true);
+    try {
+      await markGifticonUsed(orderId);
+      toast({ title: "사용 완료로 표시했어요! 🎉" });
+      setDetail(null);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "처리에 실패했어요.";
+      toast({ title: message, variant: "destructive" });
+    } finally {
+      setUsing(false);
     }
   };
 
@@ -221,7 +238,14 @@ export default function ShopPage() {
 
       {/* Issued gifticon detail sheet */}
       <AnimatePresence>
-        {detail && <DetailSheet detail={detail} onClose={() => setDetail(null)} />}
+        {detail && (
+          <DetailSheet
+            detail={detail}
+            using={using}
+            onUse={() => handleUse(detail.id)}
+            onClose={() => setDetail(null)}
+          />
+        )}
       </AnimatePresence>
     </div>
   );
@@ -287,6 +311,25 @@ function OrderCard({
           {detailLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Ticket className="w-4 h-4" />}
           기프티콘 사용하기
         </button>
+      )}
+
+      {order.status === "used" && (
+        <>
+          <button
+            onClick={onOpenDetail}
+            disabled={detailLoading}
+            className="mt-3 w-full h-10 rounded-[14px] bg-gray-100 text-gray-500 font-bold text-sm flex items-center justify-center gap-1.5 active:bg-gray-200 disabled:opacity-60"
+            data-testid={`btn-view-used-${order.id}`}
+          >
+            {detailLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Ticket className="w-4 h-4" />}
+            사용 완료한 기프티콘 보기
+          </button>
+          {order.usedAt && (
+            <p className="mt-2 text-[11px] text-gray-400 text-center">
+              {new Date(order.usedAt).toLocaleDateString("ko-KR")}에 다 썼어요
+            </p>
+          )}
+        </>
       )}
     </div>
   );
@@ -410,7 +453,17 @@ function BuyConfirmSheet({
   );
 }
 
-function DetailSheet({ detail, onClose }: { detail: GifticonOrderDetail; onClose: () => void }) {
+function DetailSheet({
+  detail,
+  using,
+  onUse,
+  onClose,
+}: {
+  detail: GifticonOrderDetail;
+  using: boolean;
+  onUse: () => void;
+  onClose: () => void;
+}) {
   const [copied, setCopied] = useState<"pin" | "barcode" | null>(null);
 
   const copy = async (text: string, which: "pin" | "barcode") => {
@@ -495,9 +548,30 @@ function DetailSheet({ detail, onClose }: { detail: GifticonOrderDetail; onClose
           </div>
         )}
 
-        <p className="text-center text-xs text-gray-400 mt-2">
-          가게에서 이 기프티콘을 보여주거나 번호를 입력하면 사용할 수 있어요.
-        </p>
+        {detail.status === "fulfilled" && (
+          <>
+            <p className="text-center text-xs text-gray-400 mt-2 mb-4">
+              가게에서 이 기프티콘을 보여주거나 번호를 입력하면 사용할 수 있어요.
+            </p>
+            <button
+              onClick={onUse}
+              disabled={using}
+              className="w-full h-[52px] rounded-[16px] bg-gradient-to-r from-primary to-accent text-white font-bold text-base flex items-center justify-center gap-2 shadow-md disabled:opacity-60"
+              data-testid="btn-mark-used"
+            >
+              {using ? <Loader2 className="w-5 h-5 animate-spin" /> : <Check className="w-5 h-5" />}
+              다 썼어요 (사용 완료)
+            </button>
+          </>
+        )}
+
+        {detail.status === "used" && (
+          <div className="mt-2 w-full rounded-[16px] bg-blue-50 text-blue-600 font-bold text-sm flex items-center justify-center gap-2 py-3.5">
+            <Check className="w-4 h-4" />
+            사용 완료한 기프티콘이에요
+            {detail.usedAt ? ` · ${new Date(detail.usedAt).toLocaleDateString("ko-KR")}` : ""}
+          </div>
+        )}
       </motion.div>
     </>
   );

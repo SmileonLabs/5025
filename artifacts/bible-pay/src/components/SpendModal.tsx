@@ -4,7 +4,6 @@ import { X, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { useAppContext } from "@/context/AppContext";
-import { SPEND_CATEGORIES } from "@/lib/spendCategories";
 
 interface SpendModalProps {
   open: boolean;
@@ -15,8 +14,6 @@ interface SpendModalProps {
 
 type Step = "purpose" | "amount" | "confirm" | "done";
 
-const QUICK_CATEGORIES = SPEND_CATEGORIES;
-
 const PRESET_AMOUNTS = [500, 1000, 2000, 3000, 5000];
 
 export function SpendModal({ open, onClose, childId, balance }: SpendModalProps) {
@@ -24,32 +21,25 @@ export function SpendModal({ open, onClose, childId, balance }: SpendModalProps)
   const { toast } = useToast();
 
   const [step, setStep] = useState<Step>("purpose");
-  const [selectedCategory, setSelectedCategory] = useState("");
   const [customPurpose, setCustomPurpose] = useState("");
   const [amount, setAmount] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const purpose = customPurpose || selectedCategory;
+  const purpose = customPurpose;
   const numAmount = parseInt(amount.replace(/,/g, ""), 10);
   const isAmountValid = !isNaN(numAmount) && numAmount > 0 && numAmount <= balance;
 
   const handleClose = () => {
     setStep("purpose");
-    setSelectedCategory("");
     setCustomPurpose("");
     setAmount("");
     onClose();
   };
 
-  const handleCategorySelect = (label: string) => {
-    setSelectedCategory(label);
-    setCustomPurpose("");
-  };
-
   const handleSubmit = async () => {
     if (!isAmountValid || !purpose.trim()) return;
     setIsSubmitting(true);
-    const category = selectedCategory || "기타";
+    const category = "기타";
     const success = await spendAllowance(childId, numAmount, purpose, category);
     setIsSubmitting(false);
     if (success) {
@@ -117,32 +107,14 @@ export function SpendModal({ open, onClose, childId, balance }: SpendModalProps)
               <AnimatePresence mode="wait">
                 {step === "purpose" && (
                   <motion.div key="purpose" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="pb-8">
-                    <div className="grid grid-cols-3 gap-3 mb-5">
-                      {QUICK_CATEGORIES.map(cat => (
-                        <button
-                          key={cat.label}
-                          onClick={() => handleCategorySelect(cat.label)}
-                          className={`flex flex-col items-center gap-2 p-4 rounded-[18px] border-2 transition-all ${
-                            selectedCategory === cat.label && !customPurpose
-                              ? "border-primary bg-primary/5 shadow-sm"
-                              : "border-gray-100 bg-gray-50 hover:border-gray-200"
-                          }`}
-                          data-testid={`category-${cat.label}`}
-                        >
-                          <span className="text-2xl">{cat.emoji}</span>
-                          <span className="text-xs font-bold text-gray-700 text-center leading-tight">{cat.label}</span>
-                        </button>
-                      ))}
-                    </div>
-
                     <div className="mb-6">
-                      <p className="text-xs font-bold text-gray-400 mb-2 uppercase tracking-wide">직접 쓰기</p>
                       <input
                         type="text"
+                        autoFocus
                         placeholder='예: "떡볶이 냠냠 🌶️"'
                         value={customPurpose}
-                        onChange={e => { setCustomPurpose(e.target.value); setSelectedCategory(""); }}
-                        className="w-full px-4 py-3 rounded-[16px] border border-gray-200 bg-white text-sm font-medium focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+                        onChange={e => setCustomPurpose(e.target.value)}
+                        className="w-full px-4 py-3.5 rounded-[16px] border border-gray-200 bg-white text-base font-medium focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
                         data-testid="input-custom-purpose"
                       />
                     </div>
