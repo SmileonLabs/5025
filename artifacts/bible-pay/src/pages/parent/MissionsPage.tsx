@@ -2,9 +2,11 @@ import { useState } from "react";
 import { useLocation } from "wouter";
 import { ChevronLeft, Plus, Trash2, ToggleLeft, ToggleRight, CheckCircle, XCircle, Clock, Camera, CalendarDays, Users } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useAppContext, type Mission, type MissionScheduleType, type PendingLog, type ChildData } from "@/context/AppContext";
+import { useAppContext, type Mission, type MissionScheduleType, type PendingLog, type ChildData, type MissionLog } from "@/context/AppContext";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
+import { MissionLogList } from "@/components/MissionLogList";
+import { MissionLogDetailModal } from "@/components/MissionLogDetailModal";
 
 const TYPE_LABELS: Record<Mission["type"], { label: string; emoji: string; desc: string; color: string }> = {
   bible:    { label: "성경읽기", emoji: "📖", desc: "책과 장을 선택 → AI 퀴즈 2문제 통과 시 즉시 지급", color: "bg-blue-50 text-blue-700 border-blue-200" },
@@ -360,10 +362,11 @@ function MissionTargetBadge({ m, kids }: { m: Mission; kids: ChildData[] }) {
 
 export default function ParentMissionsPage() {
   const [_, setLocation] = useLocation();
-  const { missions, children, pendingLogs, updateMission, deleteMission, approveMissionLog, rejectMissionLog } = useAppContext();
+  const { missions, children, pendingLogs, missionLogs, updateMission, deleteMission, approveMissionLog, rejectMissionLog } = useAppContext();
   const { toast } = useToast();
   const [createOpen, setCreateOpen] = useState(false);
-  const [tab, setTab] = useState<"missions" | "pending">("missions");
+  const [tab, setTab] = useState<"missions" | "pending" | "history">("missions");
+  const [selectedLog, setSelectedLog] = useState<MissionLog | null>(null);
 
   const handleToggle = async (m: Mission) => {
     try {
@@ -404,20 +407,26 @@ export default function ParentMissionsPage() {
         <div className="flex bg-gray-100 p-1 rounded-full">
           <button
             onClick={() => setTab("missions")}
-            className={`flex-1 py-2 text-sm font-bold rounded-full transition-all ${tab === "missions" ? "bg-white shadow-sm text-gray-900" : "text-gray-500"}`}
+            className={`flex-1 py-2 text-xs font-bold rounded-full transition-all ${tab === "missions" ? "bg-white shadow-sm text-gray-900" : "text-gray-500"}`}
           >
-            📋 미션 목록
+            📋 미션
           </button>
           <button
             onClick={() => setTab("pending")}
-            className={`flex-1 py-2 text-sm font-bold rounded-full transition-all relative ${tab === "pending" ? "bg-white shadow-sm text-gray-900" : "text-gray-500"}`}
+            className={`flex-1 py-2 text-xs font-bold rounded-full transition-all relative ${tab === "pending" ? "bg-white shadow-sm text-gray-900" : "text-gray-500"}`}
           >
             🔔 확인 요청
             {pendingLogs.length > 0 && (
-              <span className="absolute top-1 right-4 w-4 h-4 bg-red-500 text-white text-[10px] font-black rounded-full flex items-center justify-center">
+              <span className="absolute top-0.5 right-1.5 w-4 h-4 bg-red-500 text-white text-[10px] font-black rounded-full flex items-center justify-center">
                 {pendingLogs.length}
               </span>
             )}
+          </button>
+          <button
+            onClick={() => setTab("history")}
+            className={`flex-1 py-2 text-xs font-bold rounded-full transition-all ${tab === "history" ? "bg-white shadow-sm text-gray-900" : "text-gray-500"}`}
+          >
+            🗒️ 내역
           </button>
         </div>
       </div>
@@ -488,10 +497,20 @@ export default function ParentMissionsPage() {
             )}
           </>
         )}
+
+        {tab === "history" && (
+          <MissionLogList logs={missionLogs} showChild onSelect={setSelectedLog} />
+        )}
       </div>
 
       <AnimatePresence>
         {createOpen && <MissionCreateModal onClose={() => setCreateOpen(false)} />}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {selectedLog && (
+          <MissionLogDetailModal log={selectedLog} open={!!selectedLog} onClose={() => setSelectedLog(null)} showChild />
+        )}
       </AnimatePresence>
     </div>
   );

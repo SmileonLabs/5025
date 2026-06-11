@@ -334,6 +334,18 @@ router.post("/missions/:id/submit", requireChild, async (req, res) => {
   }).safeParse(req.body);
   const { bibleBook, bibleChapter, reflection } = bodyParsed.success ? bodyParsed.data : {};
 
+  // 퀴즈 스냅샷은 "표시용" best-effort 데이터다. 보상 지급 게이트(책/장/묵상)와 분리해
+  // 독립 파싱하고, 검증 실패 시 미션 완료를 막지 않고 quiz만 버린다(잘못된 400 방지).
+  // 크기 캡으로 남용을 막고, correctIndex가 옵션 범위를 벗어나면 해당 스냅샷을 버린다.
+  const quizParsed = z.array(z.object({
+    question: z.string().min(1).max(500),
+    options: z.array(z.string().max(200)).min(2).max(6),
+    correctIndex: z.number().int().min(0),
+  }).refine(q => q.correctIndex < q.options.length))
+    .max(5)
+    .safeParse((req.body as { quiz?: unknown } | undefined)?.quiz);
+  const quiz = quizParsed.success ? quizParsed.data : undefined;
+
   if (mission.type === "bible") {
     // Bible missions require chapter context (proof of which chapter was read)
     if (!bibleBook || !bibleChapter) {
@@ -369,7 +381,7 @@ router.post("/missions/:id/submit", requireChild, async (req, res) => {
     .values({ childId, amount: mission.reward, description, type: "mission" }).returning();
 
   const [log] = await db.insert(missionLogsTable)
-    .values({ missionId, childId, status: "completed", bibleBook, bibleChapter, reflection, transactionId: tx.id }).returning();
+    .values({ missionId, childId, status: "completed", bibleBook, bibleChapter, reflection, quiz: quiz ?? null, transactionId: tx.id }).returning();
 
   void sendPushToParent(child.parentId, {
     title: "🎉 미션 완료!",
@@ -399,6 +411,50 @@ router.get("/missions/pending", requireParent, async (req, res) => {
     mission: { id: r.mission.id, title: r.mission.title, reward: r.mission.reward, type: r.mission.type },
     child: { id: r.child.id, name: r.child.name, avatar: r.child.avatar },
   })));
+});
+
+// GET /api/mission-logs  (수행 내역: 아이→본인, 부모→자녀 전체. 세션 스코프, childId/parentId 클라 입력 없음)
+router.get("/mission-logs", async (req, res) => {
+  if (req.session?.parentId) {
+    const parentMissions = await db.select({ id: missionsTable.id })
+      .from(missionsTable).where(eq(missionsTable.parentId, req.session.parentId));
+    if (parentMissions.length === 0) { res.json([]); return; }
+    const missionIds = parentMissions.map((m) => m.id);
+    const rows = await db
+      .select({ log: missionLogsTable, mission: missionsTable, child: childrenTable, txAmount: transactionsTable.amount })
+      .from(missionLogsTable)
+      .innerJoin(missionsTable, eq(missionLogsTable.missionId, missionsTable.id))
+      .innerJoin(childrenTable, eq(missionLogsTable.childId, childrenTable.id))
+      .leftJoin(transactionsTable, eq(missionLogsTable.transactionId, transactionsTable.id))
+      .where(inArray(missionLogsTable.missionId, missionIds))
+      .orderBy(desc(missionLogsTable.createdAt));
+    res.json(rows.map((r) => ({
+      ...r.log,
+      // 지급 완료(transaction 존재)면 실제 지급액, 아니면 미션 예정 보상
+      rewardAmount: r.log.transactionId != null && r.txAmount != null ? r.txAmount : r.mission.reward,
+      mission: { id: r.mission.id, title: r.mission.title, type: r.mission.type, reward: r.mission.reward, scheduleType: r.mission.scheduleType },
+      child: { id: r.child.id, name: r.child.name, avatar: r.child.avatar },
+    })));
+    return;
+  }
+  if (req.session?.childId) {
+    const [child] = await db.select().from(childrenTable).where(eq(childrenTable.id, req.session.childId)).limit(1);
+    if (!child) { res.status(404).json({ error: "아이를 찾을 수 없어요." }); return; }
+    const rows = await db
+      .select({ log: missionLogsTable, mission: missionsTable, txAmount: transactionsTable.amount })
+      .from(missionLogsTable)
+      .innerJoin(missionsTable, eq(missionLogsTable.missionId, missionsTable.id))
+      .leftJoin(transactionsTable, eq(missionLogsTable.transactionId, transactionsTable.id))
+      .where(eq(missionLogsTable.childId, child.id))
+      .orderBy(desc(missionLogsTable.createdAt));
+    res.json(rows.map((r) => ({
+      ...r.log,
+      rewardAmount: r.log.transactionId != null && r.txAmount != null ? r.txAmount : r.mission.reward,
+      mission: { id: r.mission.id, title: r.mission.title, type: r.mission.type, reward: r.mission.reward, scheduleType: r.mission.scheduleType },
+    })));
+    return;
+  }
+  res.status(401).json({ error: "로그인이 필요해요." });
 });
 
 // POST /api/mission-logs/:logId/approve  (parent)

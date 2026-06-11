@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, BookOpen, Coins, ShoppingBag, Gift, RotateCcw, CheckCircle2, PenLine, Loader2, Clock } from "lucide-react";
+import { X, BookOpen, Coins, ShoppingBag, Gift, RotateCcw, Loader2, Clock } from "lucide-react";
 import { api } from "@/lib/api";
-import { TransactionType } from "@/context/AppContext";
+import { TransactionType, type QuizQuestion } from "@/context/AppContext";
 import { categoryEmoji } from "@/lib/spendCategories";
+import { MissionResultContent } from "./MissionResultContent";
 
 interface MissionResult {
   missionTitle: string | null;
@@ -11,6 +12,8 @@ interface MissionResult {
   bibleBook: string | null;
   bibleChapter: number | null;
   reflection: string | null;
+  quiz: QuizQuestion[] | null;
+  photoUrl: string | null;
   status: "completed" | "requested" | "approved" | "rejected";
   completedAt: string;
 }
@@ -40,6 +43,13 @@ const STATUS_LABEL: Record<MissionResult["status"], string> = {
   approved: "부모님 승인 완료",
   requested: "승인 대기 중",
   rejected: "반려됨",
+};
+
+const STATUS_STYLE: Record<MissionResult["status"], string> = {
+  completed: "text-green-600",
+  approved: "text-green-600",
+  requested: "text-orange-500",
+  rejected: "text-red-500",
 };
 
 function formatDateTime(dateStr: string): string {
@@ -82,7 +92,6 @@ export function TransactionDetailModal({ transactionId, open, onClose, showChild
   const Icon = config?.icon;
   const isPositive = (detail?.amount ?? 0) > 0;
   const m = detail?.mission ?? null;
-  const passage = m?.bibleBook && m?.bibleChapter ? `${m.bibleBook} ${m.bibleChapter}장` : null;
 
   return (
     <AnimatePresence>
@@ -178,33 +187,14 @@ export function TransactionDetailModal({ transactionId, open, onClose, showChild
                         <div className="flex-1 h-px bg-gray-100" />
                       </div>
 
-                      {passage && (
-                        <div className="bg-gradient-to-br from-blue-50 to-purple-50 rounded-[18px] p-4 flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-[12px] bg-white/70 flex items-center justify-center shrink-0">
-                            <span className="text-xl">📖</span>
-                          </div>
-                          <div>
-                            <p className="text-[11px] font-bold text-gray-400">읽은 성경</p>
-                            <p className="font-black text-gray-900">{passage}</p>
-                          </div>
-                        </div>
-                      )}
-
-                      {m.reflection && (
-                        <>
-                          <div className="inline-flex items-center gap-1.5 self-start bg-green-50 text-green-700 rounded-full px-3 py-1 text-xs font-bold">
-                            <CheckCircle2 className="w-3.5 h-3.5" />
-                            성경 퀴즈 통과
-                          </div>
-                          <div className="bg-white rounded-[18px] p-4 border-2 border-gray-100">
-                            <div className="flex items-center gap-1.5 mb-2">
-                              <PenLine className="w-4 h-4 text-primary-foreground" />
-                              <span className="text-sm font-bold text-gray-800">묵상 노트</span>
-                            </div>
-                            <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">{m.reflection}</p>
-                          </div>
-                        </>
-                      )}
+                      <MissionResultContent data={{
+                        missionType: m.missionType,
+                        bibleBook: m.bibleBook,
+                        bibleChapter: m.bibleChapter,
+                        reflection: m.reflection,
+                        quiz: m.quiz,
+                        photoUrl: m.photoUrl,
+                      }} />
 
                       {m.missionTitle && (
                         <div className="flex items-center justify-between px-1">
@@ -217,7 +207,7 @@ export function TransactionDetailModal({ transactionId, open, onClose, showChild
                         <span className="text-sm text-gray-400 font-medium flex items-center gap-1.5">
                           <Clock className="w-3.5 h-3.5" /> 상태
                         </span>
-                        <span className="text-sm font-bold text-green-600">{STATUS_LABEL[m.status]}</span>
+                        <span className={`text-sm font-bold ${STATUS_STYLE[m.status]}`}>{STATUS_LABEL[m.status]}</span>
                       </div>
                     </div>
                   )}

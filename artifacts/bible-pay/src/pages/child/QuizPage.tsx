@@ -2,15 +2,9 @@ import { useState, useEffect } from "react";
 import { useLocation, useParams, useSearch } from "wouter";
 import { ChevronLeft, Star, Loader2, CheckCircle2, XCircle, Sparkles, PenLine } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useAppContext } from "@/context/AppContext";
+import { useAppContext, type QuizQuestion } from "@/context/AppContext";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-
-interface QuizQuestion {
-  question: string;
-  options: string[];
-  correctIndex: number;
-}
 
 type FlowStep = "loading" | "quiz" | "reflection" | "result";
 
@@ -129,6 +123,7 @@ export default function QuizPage() {
         bibleBook: bibleBook || undefined,
         bibleChapter: bibleChapter || undefined,
         reflection: reflection.trim(),
+        quiz: questions,
       });
       setRewardGranted(true);
       setFinalBalance(result.childBalance);

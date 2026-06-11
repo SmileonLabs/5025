@@ -91,6 +91,35 @@ export interface PendingLog {
   child: { id: number; name: string; avatar: string };
 }
 
+export interface QuizQuestion {
+  question: string;
+  options: string[];
+  correctIndex: number;
+}
+
+export type MissionLogStatus = "completed" | "requested" | "approved" | "rejected";
+
+// 미션 수행 내역 1건 (GET /mission-logs). child는 부모 세션 응답에만 동봉.
+export interface MissionLog {
+  id: number;
+  missionId: number;
+  childId: number;
+  status: MissionLogStatus;
+  bibleBook: string | null;
+  bibleChapter: number | null;
+  reflection: string | null;
+  quiz: QuizQuestion[] | null;
+  photoUrl: string | null;
+  transactionId: number | null;
+  requestedAt: string;
+  approvedAt: string | null;
+  createdAt: string;
+  // 지급 완료면 실제 지급액, 아니면 미션 예정 보상
+  rewardAmount: number;
+  mission: { id: number; title: string; type: MissionType; reward: number; scheduleType: MissionScheduleType };
+  child?: { id: number; name: string; avatar: string };
+}
+
 export interface GifticonCatalogItem {
   id: number;
   parentId: number;
@@ -142,6 +171,7 @@ interface AppState {
   parentTransactions: Transaction[];
   missions: Mission[];
   pendingLogs: PendingLog[];
+  missionLogs: MissionLog[];
   childRequests: ChildRequest[];
   // Auth
   login: (email: string, password: string) => Promise<void>;
@@ -161,9 +191,11 @@ interface AppState {
   deleteMission: (id: number) => Promise<void>;
   refreshMissions: () => Promise<void>;
   // Mission actions (child)
-  submitMission: (missionId: number, opts?: { bibleBook?: string; bibleChapter?: number; reflection?: string; photoUrl?: string }) => Promise<{ childBalance: number }>;
+  submitMission: (missionId: number, opts?: { bibleBook?: string; bibleChapter?: number; reflection?: string; photoUrl?: string; quiz?: QuizQuestion[] }) => Promise<{ childBalance: number }>;
   // Pending approvals (parent)
   refreshPendingLogs: () => Promise<void>;
+  // Mission completion history (both roles)
+  refreshMissionLogs: () => Promise<void>;
   approveMissionLog: (logId: number) => Promise<void>;
   rejectMissionLog: (logId: number) => Promise<void>;
   // Transactions
@@ -203,6 +235,7 @@ export function AppProvider({ children: reactChildren }: { children: ReactNode }
   const [parentTransactions, setParentTransactions] = useState<Transaction[]>([]);
   const [missions, setMissions] = useState<Mission[]>([]);
   const [pendingLogs, setPendingLogs] = useState<PendingLog[]>([]);
+  const [missionLogs, setMissionLogs] = useState<MissionLog[]>([]);
   const [childRequests, setChildRequests] = useState<ChildRequest[]>([]);
   const [gifticonCatalog, setGifticonCatalog] = useState<GifticonCatalogItem[]>([]);
   const [gifticonOrders, setGifticonOrders] = useState<GifticonOrder[]>([]);
@@ -225,6 +258,13 @@ export function AppProvider({ children: reactChildren }: { children: ReactNode }
     try {
       const data = await api.get<PendingLog[]>("/missions/pending");
       setPendingLogs(data);
+    } catch {}
+  }, []);
+
+  const refreshMissionLogs = useCallback(async () => {
+    try {
+      const data = await api.get<MissionLog[]>("/mission-logs");
+      setMissionLogs(data);
     } catch {}
   }, []);
 
@@ -264,13 +304,14 @@ export function AppProvider({ children: reactChildren }: { children: ReactNode }
         if (me.role === "parent") {
           setRole("parent");
           setParent({ id: me.id, name: me.name, email: me.email, balance: me.balance });
-          const [kids, missionList, pending, parentTxs, requests, gOrders] = await Promise.all([
+          const [kids, missionList, pending, parentTxs, requests, gOrders, logs] = await Promise.all([
             api.get<ChildData[]>("/children"),
             api.get<Mission[]>("/missions"),
             api.get<PendingLog[]>("/missions/pending"),
             api.get<Transaction[]>("/transactions/all"),
             api.get<ChildRequest[]>("/requests"),
             api.get<GifticonOrder[]>("/gifticons/orders"),
+            api.get<MissionLog[]>("/mission-logs"),
           ]);
           setChildren(kids);
           setMissions(missionList);
@@ -278,19 +319,22 @@ export function AppProvider({ children: reactChildren }: { children: ReactNode }
           setParentTransactions(parentTxs);
           setChildRequests(requests);
           setGifticonOrders(gOrders);
+          setMissionLogs(logs);
         } else if (me.role === "child") {
           setRole("child");
           setCurrentChild({ id: me.id, name: me.name, age: me.age, avatar: me.avatar, balance: me.balance, parentId: me.parentId });
-          const [txs, missionList, catalog, orders] = await Promise.all([
+          const [txs, missionList, catalog, orders, logs] = await Promise.all([
             api.get<Transaction[]>("/transactions"),
             api.get<Mission[]>("/missions"),
             api.get<GifticonCatalogItem[]>("/gifticons/catalog"),
             api.get<GifticonOrder[]>("/gifticons/orders"),
+            api.get<MissionLog[]>("/mission-logs"),
           ]);
           setTransactions(txs);
           setMissions(missionList);
           setGifticonCatalog(catalog);
           setGifticonOrders(orders);
+          setMissionLogs(logs);
         }
       } catch {
         // not logged in
@@ -305,13 +349,14 @@ export function AppProvider({ children: reactChildren }: { children: ReactNode }
     setParent(data);
     setRole("parent");
     setCurrentChild(null);
-    const [kids, missionList, pending, parentTxs, requests, gOrders] = await Promise.all([
+    const [kids, missionList, pending, parentTxs, requests, gOrders, logs] = await Promise.all([
       api.get<ChildData[]>("/children"),
       api.get<Mission[]>("/missions"),
       api.get<PendingLog[]>("/missions/pending"),
       api.get<Transaction[]>("/transactions/all"),
       api.get<ChildRequest[]>("/requests"),
       api.get<GifticonOrder[]>("/gifticons/orders"),
+      api.get<MissionLog[]>("/mission-logs"),
     ]);
     setChildren(kids);
     setMissions(missionList);
@@ -319,6 +364,7 @@ export function AppProvider({ children: reactChildren }: { children: ReactNode }
     setParentTransactions(parentTxs);
     setChildRequests(requests);
     setGifticonOrders(gOrders);
+    setMissionLogs(logs);
   };
 
   const signup = async (name: string, email: string, password: string) => {
@@ -329,6 +375,7 @@ export function AppProvider({ children: reactChildren }: { children: ReactNode }
     setChildren([]);
     setMissions([]);
     setPendingLogs([]);
+    setMissionLogs([]);
     setParentTransactions([]);
     setChildRequests([]);
   };
@@ -343,6 +390,7 @@ export function AppProvider({ children: reactChildren }: { children: ReactNode }
     setParentTransactions([]);
     setMissions([]);
     setPendingLogs([]);
+    setMissionLogs([]);
     setChildRequests([]);
     setGifticonCatalog([]);
     setGifticonOrders([]);
@@ -354,16 +402,18 @@ export function AppProvider({ children: reactChildren }: { children: ReactNode }
     setRole("child");
     setParent(null);
     setChildren([]);
-    const [txs, missionList, catalog, orders] = await Promise.all([
+    const [txs, missionList, catalog, orders, logs] = await Promise.all([
       api.get<Transaction[]>("/transactions"),
       api.get<Mission[]>("/missions"),
       api.get<GifticonCatalogItem[]>("/gifticons/catalog"),
       api.get<GifticonOrder[]>("/gifticons/orders"),
+      api.get<MissionLog[]>("/mission-logs"),
     ]);
     setTransactions(txs);
     setMissions(missionList);
     setGifticonCatalog(catalog);
     setGifticonOrders(orders);
+    setMissionLogs(logs);
   };
 
   const createChild = async (name: string, age: number, avatar: string, pin: string) => {
@@ -391,29 +441,33 @@ export function AppProvider({ children: reactChildren }: { children: ReactNode }
     setMissions(prev => prev.filter(m => m.id !== id));
   };
 
-  const submitMission = async (missionId: number, opts?: { bibleBook?: string; bibleChapter?: number; reflection?: string; photoUrl?: string }): Promise<{ childBalance: number }> => {
+  const submitMission = async (missionId: number, opts?: { bibleBook?: string; bibleChapter?: number; reflection?: string; photoUrl?: string; quiz?: QuizQuestion[] }): Promise<{ childBalance: number }> => {
     const result = await api.post<{ childBalance: number; log: unknown; tx?: unknown; pending?: boolean }>(
       `/missions/${missionId}/submit`,
-      { bibleBook: opts?.bibleBook, bibleChapter: opts?.bibleChapter, reflection: opts?.reflection, photoUrl: opts?.photoUrl }
+      { bibleBook: opts?.bibleBook, bibleChapter: opts?.bibleChapter, reflection: opts?.reflection, photoUrl: opts?.photoUrl, quiz: opts?.quiz }
     );
     if (!result.pending && result.childBalance !== undefined) {
       setCurrentChild(prev => prev ? { ...prev, balance: result.childBalance } : prev);
       const txs = await api.get<Transaction[]>("/transactions");
       setTransactions(txs);
     }
+    // 수행 내역 갱신 (즉시 완료·승인 대기 모두 반영)
+    await refreshMissionLogs();
     return { childBalance: result.childBalance };
   };
 
   const approveMissionLog = async (logId: number) => {
-    const result = await api.post<{ childBalance: number }>(`/mission-logs/${logId}/approve`, {});
+    await api.post<{ childBalance: number }>(`/mission-logs/${logId}/approve`, {});
     setPendingLogs(prev => prev.filter(l => l.id !== logId));
     // Refresh children to show updated balance
     await refreshChildren();
+    await refreshMissionLogs();
   };
 
   const rejectMissionLog = async (logId: number) => {
     await api.post(`/mission-logs/${logId}/reject`, {});
     setPendingLogs(prev => prev.filter(l => l.id !== logId));
+    await refreshMissionLogs();
   };
 
   const chargeAllowance = async (childId: number, amount: number) => {
@@ -635,13 +689,13 @@ export function AppProvider({ children: reactChildren }: { children: ReactNode }
 
   return (
     <AppContext.Provider value={{
-      role, loading, parent, currentChild, children, transactions, parentTransactions, missions, pendingLogs, childRequests,
+      role, loading, parent, currentChild, children, transactions, parentTransactions, missions, pendingLogs, missionLogs, childRequests,
       login, signup, logout, childLogin,
       startTopupCheckout, confirmTopup,
       createChild, deleteChild, refreshChildren,
       createMission, updateMission, deleteMission, refreshMissions,
       submitMission,
-      refreshPendingLogs, approveMissionLog, rejectMissionLog,
+      refreshPendingLogs, refreshMissionLogs, approveMissionLog, rejectMissionLog,
       chargeAllowance, spendAllowance, refreshParentTransactions,
       createRequest, refreshRequests, resolveRequest,
       gifticonCatalog, gifticonOrders, refreshGifticonCatalog, refreshGifticonOrders,

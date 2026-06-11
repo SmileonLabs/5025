@@ -97,6 +97,8 @@ router.get("/transactions/:id", async (req, res) => {
         bibleBook: row.log.bibleBook,
         bibleChapter: row.log.bibleChapter,
         reflection: row.log.reflection,
+        quiz: row.log.quiz,
+        photoUrl: row.log.photoUrl,
         status: row.log.status,
         completedAt: row.log.approvedAt ?? row.log.createdAt,
       };
