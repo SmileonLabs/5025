@@ -41,11 +41,10 @@ export function ParentTopupModal({ open, onClose }: ParentTopupModalProps) {
   const handleConfirm = async () => {
     setLoading(true);
     try {
-      // Opens the secure Stripe Checkout page in a new tab (Stripe can't render
-      // inside an iframe). Once it's open, close the sheet and guide the parent;
-      // the budget updates automatically when the payment tab completes.
+      // Toss Payments redirects back to the app after authentication; the app
+      // confirms the payment with the server and updates the budget.
       await startTopupCheckout(numAmount);
-      toast({ title: "새 탭에서 결제를 완료해주세요." });
+      toast({ title: "토스 결제창에서 결제를 완료해주세요." });
       handleClose();
     } catch (err: any) {
       toast({ title: err.message ?? "결제 페이지를 여는 데 실패했어요.", variant: "destructive" });
@@ -185,16 +184,16 @@ export function ParentTopupModal({ open, onClose }: ParentTopupModalProps) {
 
                     <div className="flex items-center gap-4 p-4 rounded-[18px] border-2 border-blue-400 bg-blue-50 mb-6">
                       <span className="text-2xl">💳</span>
-                      <span className="font-bold text-blue-700">신용·체크카드</span>
+                      <span className="font-bold text-blue-700">카드·간편결제</span>
                       <div className="ml-auto w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center">
                         <div className="w-2 h-2 rounded-full bg-white" />
                       </div>
                     </div>
 
                     <p className="text-xs text-gray-400 text-center mb-4 leading-relaxed">
-                      새 탭에서 안전한 Stripe 결제 페이지가 열려요.<br />
+                      안전한 Toss Payments 결제창으로 이동해요.<br />
                       지금은 테스트 모드라 실제 결제는 일어나지 않아요.<br />
-                      카드번호 <span className="font-bold text-gray-500">4242 4242 4242 4242</span>로 결제해보세요.
+                      결제창 안내에 따라 카드 또는 간편결제를 테스트해보세요.
                     </p>
 
                     <div className="flex gap-3">
@@ -211,7 +210,7 @@ export function ParentTopupModal({ open, onClose }: ParentTopupModalProps) {
                         className="flex-[2] h-[54px] rounded-[16px] font-bold text-base bg-blue-500 hover:bg-blue-600 text-white"
                         data-testid="btn-topup-confirm"
                       >
-                        {loading ? "결제 페이지 여는 중..." : "결제하기 💳"}
+                        {loading ? "결제창 여는 중..." : "결제하기 💳"}
                       </Button>
                     </div>
                   </motion.div>

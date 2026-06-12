@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { MissionLogList } from "@/components/MissionLogList";
 import { MissionLogDetailModal } from "@/components/MissionLogDetailModal";
+import { apiUrl } from "@/lib/api";
 
 const TYPE_LABELS: Record<Mission["type"], { label: string; emoji: string; desc: string; color: string }> = {
   bible:    { label: "성경읽기", emoji: "📖", desc: "책과 장을 선택 → AI 퀴즈 2문제 통과 시 즉시 지급", color: "bg-blue-50 text-blue-700 border-blue-200" },
@@ -303,7 +304,7 @@ function PendingCard({ log, onApprove, onReject }: { log: PendingLog; onApprove:
 
       {log.photoUrl && (
         <img
-          src={`/api/storage${log.photoUrl}`}
+          src={apiUrl(`/storage${log.photoUrl}`)}
           alt="인증샷"
           className="w-full max-h-56 object-cover rounded-[14px] border border-gray-100 mb-3"
           data-testid={`pending-photo-${log.id}`}

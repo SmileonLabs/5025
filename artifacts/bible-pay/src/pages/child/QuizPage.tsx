@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useAppContext, type QuizQuestion } from "@/context/AppContext";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
+import { apiUrl } from "@/lib/api";
 
 type FlowStep = "loading" | "quiz" | "reflection" | "result";
 
@@ -70,7 +71,7 @@ export default function QuizPage() {
     setReflection("");
 
     try {
-      const res = await fetch("/api/quiz/generate", {
+      const res = await fetch(apiUrl("/quiz/generate"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",

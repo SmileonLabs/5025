@@ -49,15 +49,17 @@ async function initStripe(): Promise<void> {
 }
 
 async function main(): Promise<void> {
-  try {
-    await initStripe();
-  } catch (err) {
-    // Crediting uses the live Stripe API directly, so the app still works even
-    // if Stripe sync setup transiently fails. Log and keep serving.
-    logger.error(
-      { err },
-      "Stripe initialization failed; continuing without Stripe sync",
-    );
+  if (process.env["ENABLE_STRIPE_SYNC"] === "true") {
+    try {
+      await initStripe();
+    } catch (err) {
+      logger.error(
+        { err },
+        "Stripe initialization failed; continuing without Stripe sync",
+      );
+    }
+  } else {
+    logger.info("Stripe sync disabled; using Toss Payments top-up flow");
   }
 
   app.listen(port, (err) => {

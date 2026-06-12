@@ -1,7 +1,11 @@
-const BASE = "/api";
+const BASE = (import.meta.env.VITE_API_BASE_URL ?? "/api").replace(/\/$/, "");
+
+export function apiUrl(path: string): string {
+  return `${BASE}${path.startsWith("/") ? path : `/${path}`}`;
+}
 
 async function req<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, {
+  const res = await fetch(apiUrl(path), {
     credentials: "include",
     headers: { "Content-Type": "application/json", ...(options.headers ?? {}) },
     ...options,

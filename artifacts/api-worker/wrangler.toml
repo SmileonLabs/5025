@@ -1,0 +1,17 @@
+name = "api-5025"
+main = "src/index.ts"
+compatibility_date = "2026-06-01"
+compatibility_flags = ["nodejs_compat"]
+
+[vars]
+COOKIE_SAMESITE = "None"
+COOKIE_SECURE = "true"
+SUPABASE_STORAGE_BUCKET = "mission-photos"
+TOSS_CLIENT_KEY = "test_ck_D5GePWvyJnrK0W0k6q8gLzN97Eoq"
+
+# Set TOSS_SECRET_KEY with `wrangler secret put TOSS_SECRET_KEY`.
+
+# Configure this after creating a Cloudflare Hyperdrive connection to Supabase:
+# [[hyperdrive]]
+# binding = "HYPERDRIVE"
+# id = "your-hyperdrive-id"

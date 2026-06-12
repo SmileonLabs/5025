@@ -32,6 +32,13 @@ node_modules
 /connect.lock
 /coverage
 /libpeerconnection.log
+.wrangler/
+.dev.vars
+.dev.vars.*
+.env
+.env.*
+!.env.example
+!.dev.vars.example
 npm-debug.log
 yarn-error.log
 testem.log

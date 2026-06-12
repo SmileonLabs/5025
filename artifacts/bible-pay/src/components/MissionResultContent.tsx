@@ -1,5 +1,6 @@
 import { CheckCircle2, PenLine, Camera } from "lucide-react";
 import type { QuizQuestion } from "@/context/AppContext";
+import { apiUrl } from "@/lib/api";
 
 // 미션 수행 "증거"(성경 구절·퀴즈·묵상·인증샷)만 담는 프레젠테이션 컴포넌트.
 // 상태/금액/일시 등 메타는 이를 감싸는 모달이 담당한다.
@@ -102,7 +103,7 @@ export function MissionResultContent({ data }: { data: MissionResultView }) {
             <span className="text-sm font-bold text-gray-800">인증샷</span>
           </div>
           <img
-            src={`/api/storage${data.photoUrl}`}
+            src={apiUrl(`/storage${data.photoUrl}`)}
             alt="인증샷"
             className="w-full max-h-72 object-cover rounded-[16px] border border-gray-100"
             data-testid="result-photo"

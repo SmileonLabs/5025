@@ -1,5 +1,6 @@
 import React, { createContext, useState, useContext, useCallback, useEffect, useRef, ReactNode } from "react";
 import { api } from "@/lib/api";
+import { requestTossTopupPayment, type TossTopupRequest } from "@/lib/tossPayments";
 import { toast } from "@/hooks/use-toast";
 
 export type Role = "parent" | "child" | null;
@@ -42,6 +43,24 @@ export interface ChildRequest {
   childName: string;
   childAvatar: string;
 }
+
+type TopupConfirmRequest = {
+  paymentKey: string;
+  orderId: string;
+  amount: number;
+};
+
+type TopupConfirmResult = {
+  credited: boolean;
+  paidAmount: number;
+  creditedPoints: number;
+  balance: number;
+  status?: string;
+};
+
+type TopupPrepareResponse = TossTopupRequest & {
+  provider: "toss";
+};
 
 export type MissionType = "bible" | "activity";
 export type MissionScheduleType = "daily" | "once";
@@ -178,9 +197,9 @@ interface AppState {
   signup: (name: string, email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   childLogin: (childId: number, pin: string) => Promise<void>;
-  // Parent top-up (Stripe Checkout)
+  // Parent top-up (Toss Payments)
   startTopupCheckout: (amount: number) => Promise<void>;
-  confirmTopup: (sessionId: string) => Promise<{ credited: boolean; paidAmount: number; creditedPoints: number; balance: number; status?: string }>;
+  confirmTopup: (params: TopupConfirmRequest) => Promise<TopupConfirmResult>;
   // Child management
   createChild: (name: string, age: number, avatar: string, pin: string) => Promise<void>;
   deleteChild: (childId: number) => Promise<void>;
@@ -485,48 +504,41 @@ export function AppProvider({ children: reactChildren }: { children: ReactNode }
   };
 
   const startTopupCheckout = useCallback(async (amount: number) => {
-    // Stripe Checkout refuses to render inside an iframe (X-Frame-Options), and
-    // the app often runs embedded (e.g. the Replit canvas), so open Checkout in a
-    // separate tab. Open the blank tab synchronously inside the click gesture so
-    // the popup blocker doesn't kill it; only then fetch the session URL.
-    const checkoutTab = window.open("about:blank", "_blank");
-    if (!checkoutTab) {
-      throw new Error("팝업이 차단됐어요. 팝업을 허용한 뒤 다시 시도해주세요.");
-    }
-    try {
-      const { url } = await api.post<{ url: string }>("/topups/checkout-session", { amount });
-      checkoutTab.location.href = url;
-    } catch (err) {
-      checkoutTab.close();
-      throw err;
-    }
+    const topup = await api.post<TopupPrepareResponse>("/topups/prepare", { amount });
+    await requestTossTopupPayment(topup);
   }, []);
 
-  const confirmTopup = useCallback(async (sessionId: string) => {
-    const result = await api.post<{ credited: boolean; paidAmount: number; creditedPoints: number; balance: number; status?: string }>(
+  const confirmTopup = useCallback(async (params: TopupConfirmRequest) => {
+    const result = await api.post<TopupConfirmResult>(
       "/topups/confirm",
-      { sessionId },
+      params,
     );
     setParent(prev => (prev ? { ...prev, balance: result.balance } : prev));
     return result;
   }, []);
 
-  // Capture the Stripe return params on first render, BEFORE the router can
+  // Capture the Toss return params on first render, BEFORE the router can
   // redirect "/" to the dashboard and strip the query string. (LoginPage, a
   // descendant, runs its redirect effect before this provider's effect.)
-  const [stripeReturn] = useState(() => {
+  const [topupReturn] = useState(() => {
     const params = new URLSearchParams(window.location.search);
-    return { topup: params.get("topup"), sessionId: params.get("session_id") };
+    return {
+      topup: params.get("topup"),
+      paymentKey: params.get("paymentKey"),
+      orderId: params.get("orderId"),
+      amount: params.get("amount"),
+      errorCode: params.get("code"),
+      errorMessage: params.get("message"),
+    };
   });
 
-  // Handle the return from Stripe Checkout. The redirect lands on "/" with
-  // ?topup=success&session_id=... (or ?topup=cancel), so confirm here once the
+  // Handle the return from Toss Payments. The redirect lands on "/" with
+  // ?topup=success&paymentKey=...&orderId=...&amount=..., so confirm here once the
   // parent session is restored, then clean the URL.
   const topupHandledRef = useRef(false);
 
-  // Cross-tab budget sync: Stripe Checkout completes in a separate tab, so when
-  // that tab credits the top-up it broadcasts the new balance and any other open
-  // tab (e.g. the embedded app) updates without a manual refresh.
+  // Cross-tab budget sync keeps the embedded web app fresh if a payment return
+  // completes in another browser context.
   const topupChannelRef = useRef<BroadcastChannel | null>(null);
   useEffect(() => {
     if (typeof BroadcastChannel === "undefined") return;
@@ -549,20 +561,25 @@ export function AppProvider({ children: reactChildren }: { children: ReactNode }
   useEffect(() => {
     if (loading || topupHandledRef.current) return;
 
-    const { topup, sessionId } = stripeReturn;
+    const { topup, paymentKey, orderId, amount, errorCode, errorMessage } = topupReturn;
     if (!topup) return;
 
     const cleanUrl = () => window.history.replaceState({}, "", window.location.pathname);
 
-    if (topup === "cancel") {
+    if (topup === "cancel" || topup === "fail") {
       topupHandledRef.current = true;
       cleanUrl();
-      toast({ title: "결제를 취소했어요." });
+      const canceled = errorCode === "PAY_PROCESS_CANCELED";
+      toast({
+        title: canceled ? "결제를 취소했어요." : errorMessage ?? "결제가 완료되지 않았어요.",
+        variant: canceled ? undefined : "destructive",
+      });
       return;
     }
 
     if (topup === "success") {
-      if (!sessionId) {
+      const paidAmount = Number(amount);
+      if (!paymentKey || !orderId || !amount || !Number.isInteger(paidAmount)) {
         topupHandledRef.current = true;
         cleanUrl();
         return;
@@ -572,7 +589,7 @@ export function AppProvider({ children: reactChildren }: { children: ReactNode }
       topupHandledRef.current = true;
       (async () => {
         try {
-          const result = await confirmTopup(sessionId);
+          const result = await confirmTopup({ paymentKey, orderId, amount: paidAmount });
           cleanUrl();
           if (result.credited) {
             toast({ title: `충전 완료! +${result.creditedPoints.toLocaleString("ko-KR")}P` });
@@ -581,12 +598,11 @@ export function AppProvider({ children: reactChildren }: { children: ReactNode }
               balance: result.balance,
               creditedPoints: result.creditedPoints,
             });
-          } else if (result.status && result.status !== "paid") {
+          } else if (result.status && result.status !== "DONE") {
             toast({ title: "결제가 아직 완료되지 않았어요.", variant: "destructive" });
           } else {
-            // Already credited (e.g. the webhook won the race). The balance in the
-            // response is still authoritative, so broadcast it too — otherwise an
-            // embedded tab would stay stale until a manual refresh.
+            // Already credited. The response balance is still authoritative, so
+            // broadcast it too in case another app context is open.
             toast({ title: "이미 처리된 결제예요." });
             topupChannelRef.current?.postMessage({
               type: "topup-success",
@@ -601,7 +617,7 @@ export function AppProvider({ children: reactChildren }: { children: ReactNode }
         }
       })();
     }
-  }, [loading, role, confirmTopup, stripeReturn]);
+  }, [loading, role, confirmTopup, topupReturn]);
 
   const spendAllowance = async (childId: number, amount: number, purpose: string, category?: string): Promise<boolean> => {
     try {
