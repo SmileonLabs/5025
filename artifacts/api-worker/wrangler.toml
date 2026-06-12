@@ -11,7 +11,6 @@ TOSS_CLIENT_KEY = "test_ck_D5GePWvyJnrK0W0k6q8gLzN97Eoq"
 
 # Set TOSS_SECRET_KEY with `wrangler secret put TOSS_SECRET_KEY`.
 
-# Configure this after creating a Cloudflare Hyperdrive connection to Supabase:
-# [[hyperdrive]]
-# binding = "HYPERDRIVE"
-# id = "your-hyperdrive-id"
+[[hyperdrive]]
+binding = "HYPERDRIVE"
+id = "15de82730d734a329a044a43fcf47678"
