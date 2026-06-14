@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
-import { ChevronLeft, Plus, Trash2, ToggleLeft, ToggleRight, CheckCircle, XCircle, Clock, Camera, CalendarDays, Users } from "lucide-react";
+import { ChevronLeft, Plus, Trash2, ToggleLeft, ToggleRight, CheckCircle, XCircle, Clock, Camera, CalendarDays, Users, RefreshCw } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAppContext, type Mission, type MissionScheduleType, type PendingLog, type ChildData, type MissionLog } from "@/context/AppContext";
 import { Button } from "@/components/ui/button";
@@ -33,6 +33,8 @@ function MissionCreateModal({ onClose }: { onClose: () => void }) {
   const [scheduledDate, setScheduledDate] = useState("");
   const [timeLimit, setTimeLimit] = useState("");
   const [requiresPhoto, setRequiresPhoto] = useState(false);
+  const [maxLimited, setMaxLimited] = useState(false);
+  const [maxCount, setMaxCount] = useState("");
   const [assignToAll, setAssignToAll] = useState(true);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [saving, setSaving] = useState(false);
@@ -52,6 +54,15 @@ function MissionCreateModal({ onClose }: { onClose: () => void }) {
     if (type === "activity" && scheduleType === "once" && !scheduledDate) {
       toast({ title: "지정일을 선택해주세요.", variant: "destructive" }); return;
     }
+    // 수행 횟수 제한은 매일 활동미션에만 적용 (once는 본래 1회, bible은 제외)
+    let maxCompletions: number | null = null;
+    if (type === "activity" && scheduleType === "daily" && maxLimited) {
+      const n = parseInt(maxCount, 10);
+      if (!maxCount || isNaN(n) || n < 1) {
+        toast({ title: "수행 횟수를 1 이상으로 입력해주세요.", variant: "destructive" }); return;
+      }
+      maxCompletions = n;
+    }
     setSaving(true);
     try {
       await createMission({
@@ -63,6 +74,7 @@ function MissionCreateModal({ onClose }: { onClose: () => void }) {
         scheduledDate: type === "activity" && scheduleType === "once" ? scheduledDate : null,
         timeLimit: type === "activity" && timeLimit ? timeLimit : null,
         requiresPhoto: type === "activity" ? requiresPhoto : false,
+        maxCompletions,
         assignToAll: children.length === 0 ? true : assignToAll,
         childIds: children.length === 0 || assignToAll ? undefined : selectedIds,
       });
@@ -229,6 +241,49 @@ function MissionCreateModal({ onClose }: { onClose: () => void }) {
               </div>
             )}
 
+            {scheduleType === "daily" && (
+              <div>
+                <p className="text-sm font-bold text-gray-600 mb-2 flex items-center gap-1">
+                  <RefreshCw className="w-4 h-4" /> 수행 횟수
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() => setMaxLimited(false)}
+                    className={`py-2.5 rounded-[14px] border-2 text-sm font-bold transition-all ${
+                      !maxLimited ? "border-primary bg-white" : "border-gray-100 bg-white/60 text-gray-500"
+                    }`}
+                    data-testid="max-unlimited"
+                  >
+                    ♾️ 무제한
+                  </button>
+                  <button
+                    onClick={() => setMaxLimited(true)}
+                    className={`py-2.5 rounded-[14px] border-2 text-sm font-bold transition-all ${
+                      maxLimited ? "border-primary bg-white" : "border-gray-100 bg-white/60 text-gray-500"
+                    }`}
+                    data-testid="max-limited"
+                  >
+                    🔢 횟수 지정
+                  </button>
+                </div>
+                {maxLimited && (
+                  <div className="relative mt-2">
+                    <input
+                      type="number"
+                      min={1}
+                      placeholder="예) 5"
+                      value={maxCount}
+                      onChange={e => setMaxCount(e.target.value)}
+                      className="w-full px-4 py-3 rounded-[14px] border border-gray-200 text-sm font-medium focus:outline-none focus:border-primary pr-10"
+                      data-testid="input-max-count"
+                    />
+                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-bold">회</span>
+                  </div>
+                )}
+                <p className="text-[11px] text-gray-400 mt-1">정한 횟수만큼 수행하면 더 이상 할 수 없어요. (하루 1번씩)</p>
+              </div>
+            )}
+
             <div>
               <p className="text-sm font-bold text-gray-600 mb-1.5 flex items-center gap-1">
                 <Clock className="w-4 h-4" /> 마감 시간 (선택)
@@ -346,6 +401,11 @@ function MissionMeta({ m }: { m: Mission }) {
       {m.timeLimit && (
         <span className="inline-flex items-center gap-1 text-[10px] font-bold text-rose-500 bg-rose-50 rounded-full px-2 py-0.5">
           <Clock className="w-2.5 h-2.5" /> {m.timeLimit}까지
+        </span>
+      )}
+      {m.maxCompletions != null && (
+        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-violet-600 bg-violet-50 rounded-full px-2 py-0.5">
+          <RefreshCw className="w-2.5 h-2.5" /> {m.maxCompletions}회까지
         </span>
       )}
       {m.requiresPhoto && (

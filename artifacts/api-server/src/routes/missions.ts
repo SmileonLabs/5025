@@ -42,6 +42,8 @@ const MissionFields = z.object({
     .nullable()
     .optional(),
   requiresPhoto: z.boolean().default(false),
+  // activity 전용: 아이별 최대 수행 횟수(승인+대기 누적, 반려 제외). null/미지정이면 무제한.
+  maxCompletions: z.number().int().min(1).max(999).nullable().optional(),
   // 대상 아이: assignToAll=true면 부모의 모든 아이(동적). false면 childIds에 명시된 아이만.
   assignToAll: z.boolean().default(true),
   childIds: z.array(z.number().int().positive()).optional(),
@@ -145,6 +147,10 @@ router.post("/missions", requireParent, async (req, res) => {
   if (!parsed.success) { res.status(400).json({ error: parsed.error.issues[0]?.message ?? "입력값을 확인해주세요." }); return; }
   const parentId = req.session.parentId!;
   const { childIds, assignToAll, ...missionData } = parsed.data;
+  // maxCompletions(수행 횟수 제한)는 매일(daily) 활동(activity) 미션에만 의미 있음 — 그 외엔 null로 정규화.
+  if (missionData.type !== "activity" || missionData.scheduleType !== "daily") {
+    missionData.maxCompletions = null;
+  }
 
   // 특정 아이 지정 시 소유 검증 (cross-parent IDOR 방지)
   let validChildIds: number[] = [];
@@ -177,6 +183,12 @@ router.patch("/missions/:id", requireParent, async (req, res) => {
   const parsed = UpdateMissionBody.safeParse(req.body);
   if (!parsed.success) { res.status(400).json({ error: parsed.error.issues[0]?.message ?? "입력값을 확인해주세요." }); return; }
   const { childIds, assignToAll, ...missionData } = parsed.data;
+  // maxCompletions는 매일 활동미션에만 유효 — 패치 결과가 그 외 형태면 null로 정규화(스테일 방지).
+  const effType = missionData.type ?? existing.type;
+  const effSchedule = missionData.scheduleType ?? existing.scheduleType;
+  if (effType !== "activity" || effSchedule !== "daily") {
+    missionData.maxCompletions = null;
+  }
 
   // 대상을 특정 아이로 바꾸는 경우 소유 검증
   let validChildIds: number[] = [];
@@ -288,42 +300,78 @@ router.post("/missions/:id/submit", requireChild, async (req, res) => {
       }
     }
 
-    // 중복 방지: 미처리(requested/approved) 요청이 있으면 차단.
-    // daily는 오늘(KST) 분만, once는 기간 무관. rejected는 제외(재도전 가능).
-    const dupConds = [
-      eq(missionLogsTable.missionId, missionId),
-      eq(missionLogsTable.childId, childId),
-      inArray(missionLogsTable.status, ["requested", "approved"]),
-    ];
-    if (mission.scheduleType === "daily") {
-      dupConds.push(
-        sql`(${missionLogsTable.createdAt} AT TIME ZONE 'Asia/Seoul')::date = (now() AT TIME ZONE 'Asia/Seoul')::date`,
-      );
-    }
-    const dup = await db
-      .select({ id: missionLogsTable.id })
-      .from(missionLogsTable)
-      .where(and(...dupConds))
-      .limit(1);
-    if (dup.length > 0) {
-      res.status(409).json({
-        error:
-          mission.scheduleType === "daily"
-            ? "오늘은 이미 완료 요청했어요."
-            : "이미 완료 요청한 미션이에요.",
-      });
+    // 동시 제출(더블탭/병렬)이 중복 검사와 횟수 검사를 동시에 통과하면 requested 로그가
+    // 초과 생성되고 부모가 양쪽을 승인해 포인트가 초과 지급될 수 있다. (missionId, childId)
+    // advisory lock으로 같은 아이의 같은 미션 제출을 직렬화하고, 중복·횟수 검사와 insert를
+    // 한 트랜잭션에서 원자적으로 처리한다.
+    type SubmitResult =
+      | { ok: true; log: typeof missionLogsTable.$inferSelect }
+      | { ok: false; error: string };
+    const result = await db.transaction(async (tx): Promise<SubmitResult> => {
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(${missionId}::int, ${childId}::int)`);
+
+      // 중복 방지: 미처리(requested/approved) 요청이 있으면 차단.
+      // daily는 오늘(KST) 분만, once는 기간 무관. rejected는 제외(재도전 가능).
+      const dupConds = [
+        eq(missionLogsTable.missionId, missionId),
+        eq(missionLogsTable.childId, childId),
+        inArray(missionLogsTable.status, ["requested", "approved"]),
+      ];
+      if (mission.scheduleType === "daily") {
+        dupConds.push(
+          sql`(${missionLogsTable.createdAt} AT TIME ZONE 'Asia/Seoul')::date = (now() AT TIME ZONE 'Asia/Seoul')::date`,
+        );
+      }
+      const dup = await tx
+        .select({ id: missionLogsTable.id })
+        .from(missionLogsTable)
+        .where(and(...dupConds))
+        .limit(1);
+      if (dup.length > 0) {
+        return {
+          ok: false,
+          error:
+            mission.scheduleType === "daily"
+              ? "오늘은 이미 완료 요청했어요."
+              : "이미 완료 요청한 미션이에요.",
+        };
+      }
+
+      // 수행 횟수 제한: 이 아이의 누적 수행(승인+대기) 횟수가 상한에 도달하면 차단.
+      // rejected는 세지 않음(재도전 가능). maxCompletions가 null이면 무제한.
+      if (mission.maxCompletions != null) {
+        const [{ cnt }] = await tx
+          .select({ cnt: sql<number>`count(*)::int` })
+          .from(missionLogsTable)
+          .where(
+            and(
+              eq(missionLogsTable.missionId, missionId),
+              eq(missionLogsTable.childId, childId),
+              inArray(missionLogsTable.status, ["requested", "approved"]),
+            ),
+          );
+        if (cnt >= mission.maxCompletions) {
+          return { ok: false, error: `이 미션은 ${mission.maxCompletions}번까지만 할 수 있어요. 이미 다 했어요! 🎉` };
+        }
+      }
+
+      const [inserted] = await tx
+        .insert(missionLogsTable)
+        .values({ missionId, childId, status: "requested", photoUrl: photoUrl ?? null })
+        .returning();
+      return { ok: true, log: inserted };
+    });
+
+    if (!result.ok) {
+      res.status(409).json({ error: result.error });
       return;
     }
 
-    const [log] = await db
-      .insert(missionLogsTable)
-      .values({ missionId, childId, status: "requested", photoUrl: photoUrl ?? null })
-      .returning();
     void sendPushToParent(child.parentId, {
       title: "📋 미션 승인 요청",
       body: `${child.name}님이 '${mission.title}' 미션을 완료했어요. 승인하면 ${mission.reward.toLocaleString("ko-KR")}P가 지급돼요.`,
     });
-    res.status(201).json({ log, pending: true });
+    res.status(201).json({ log: result.log, pending: true });
     return;
   }
 

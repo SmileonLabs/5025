@@ -58,6 +58,8 @@ export interface Mission {
   scheduledDate: string | null;
   timeLimit: string | null;
   requiresPhoto: boolean;
+  // activity 전용: 아이별 최대 수행 횟수(승인+대기 누적). null이면 무제한.
+  maxCompletions: number | null;
   // 대상 아이: assignToAll=true면 부모의 모든 아이. false면 assignedChildIds에 명시된 아이만.
   assignToAll: boolean;
   assignedChildIds: number[];
@@ -75,6 +77,8 @@ export interface MissionInput {
   scheduledDate?: string | null;
   timeLimit?: string | null;
   requiresPhoto: boolean;
+  // activity 전용: 아이별 최대 수행 횟수. null/생략 시 무제한.
+  maxCompletions?: number | null;
   // assignToAll=false면 childIds에 대상 아이를 명시 (생략 시 전체 대상)
   assignToAll?: boolean;
   childIds?: number[];
@@ -187,7 +191,7 @@ interface AppState {
   refreshChildren: () => Promise<void>;
   // Mission management (parent)
   createMission: (data: MissionInput) => Promise<void>;
-  updateMission: (id: number, data: Partial<Pick<Mission, "title" | "description" | "reward" | "isActive" | "scheduleType" | "scheduledDate" | "timeLimit" | "requiresPhoto" | "assignToAll">> & { childIds?: number[] }) => Promise<void>;
+  updateMission: (id: number, data: Partial<Pick<Mission, "title" | "description" | "reward" | "isActive" | "scheduleType" | "scheduledDate" | "timeLimit" | "requiresPhoto" | "maxCompletions" | "assignToAll">> & { childIds?: number[] }) => Promise<void>;
   deleteMission: (id: number) => Promise<void>;
   refreshMissions: () => Promise<void>;
   // Mission actions (child)
@@ -431,7 +435,7 @@ export function AppProvider({ children: reactChildren }: { children: ReactNode }
     setMissions(prev => [mission, ...prev]);
   };
 
-  const updateMission = async (id: number, data: Partial<Pick<Mission, "title" | "description" | "reward" | "isActive" | "scheduleType" | "scheduledDate" | "timeLimit" | "requiresPhoto" | "assignToAll">> & { childIds?: number[] }) => {
+  const updateMission = async (id: number, data: Partial<Pick<Mission, "title" | "description" | "reward" | "isActive" | "scheduleType" | "scheduledDate" | "timeLimit" | "requiresPhoto" | "maxCompletions" | "assignToAll">> & { childIds?: number[] }) => {
     const updated = await api.patch<Mission>(`/missions/${id}`, data);
     setMissions(prev => prev.map(m => m.id === id ? updated : m));
   };

@@ -38,7 +38,7 @@ async function uploadPhoto(file: File): Promise<string> {
 
 export function MissionCard({ mission, childId }: MissionCardProps) {
   const [_, setLocation] = useLocation();
-  const { submitMission } = useAppContext();
+  const { submitMission, missionLogs } = useAppContext();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(false);
@@ -48,6 +48,15 @@ export function MissionCard({ mission, childId }: MissionCardProps) {
 
   const info = TYPE_INFO[mission.type];
   const isActivity = mission.type === "activity";
+
+  // 수행 횟수 제한(활동미션): 이 아이의 누적 수행(승인+대기) 횟수. rejected는 제외(재도전 가능).
+  const usedCount =
+    mission.maxCompletions != null
+      ? missionLogs.filter(
+          l => l.missionId === mission.id && (l.status === "approved" || l.status === "requested"),
+        ).length
+      : 0;
+  const limitReached = mission.maxCompletions != null && usedCount >= mission.maxCompletions;
 
   const pickFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
@@ -130,6 +139,11 @@ export function MissionCard({ mission, childId }: MissionCardProps) {
               <Camera className="w-3 h-3" /> 인증샷 필요
             </span>
           )}
+          {mission.maxCompletions != null && (
+            <span className="inline-flex items-center gap-1 text-[11px] font-bold text-violet-600 bg-violet-50 rounded-full px-2.5 py-1">
+              <RefreshCw className="w-3 h-3" /> {usedCount}/{mission.maxCompletions}회
+            </span>
+          )}
         </div>
       )}
 
@@ -140,7 +154,7 @@ export function MissionCard({ mission, childId }: MissionCardProps) {
       )}
 
       {/* 인증샷 선택 / 미리보기 (activity & 제출 전) */}
-      {isActivity && !done && childId && (
+      {isActivity && !done && !limitReached && childId && (
         <div className="mb-3">
           <input
             ref={inputRef}
@@ -187,6 +201,10 @@ export function MissionCard({ mission, childId }: MissionCardProps) {
         done ? (
           <div className="w-full py-3 rounded-[14px] text-center font-bold text-sm bg-orange-50 text-orange-600">
             {isActivity ? "⏳ 부모님 확인 중..." : "✅ 완료됐어요!"}
+          </div>
+        ) : limitReached ? (
+          <div className="w-full py-3 rounded-[14px] text-center font-bold text-sm bg-violet-50 text-violet-600">
+            🎉 정해진 횟수를 모두 채웠어요! ({mission.maxCompletions}회)
           </div>
         ) : (
           <button
