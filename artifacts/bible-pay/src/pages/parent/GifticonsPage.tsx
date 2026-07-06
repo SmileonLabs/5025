@@ -136,7 +136,7 @@ export default function ParentGifticonsPage() {
           onClose={() => setFulfilling(null)}
           onSubmit={async (issued) => {
             await fulfillGifticonOrderByParent(fulfilling.id, issued);
-            toast({ title: "발급 완료! 아이가 바로 사용할 수 있어요 🎁" });
+            toast({ title: "발급 완료! 바로 사용 완료로 처리됐어요 🎁" });
             setFulfilling(null);
           }}
         />
@@ -463,7 +463,7 @@ function FulfillSheet({
       <p className="text-xs text-gray-400 text-center mb-4 leading-relaxed">
         핀번호·바코드·이미지는 선택이에요.
         <br />
-        직접 전달했다면 그냥 발급만 눌러도 돼요.
+        발급하면 바로 사용 완료로 처리돼요.
       </p>
       <div className="space-y-2.5">
         <Input

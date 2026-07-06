@@ -147,6 +147,13 @@ export async function refundGifticonOrder(params: {
  * (returns undefined). No balance change — the price was already deducted at
  * request time. Pass `requireParentId` to scope a parent-initiated fulfill to
  * their own household; the check lives in the WHERE clause (IDOR-safe).
+ *
+ * Pass `markUsed: true` to collapse issuance and redemption into one atomic
+ * step (requested → used, both `fulfilledAt` and `usedAt` set to now) — used by
+ * the parent fulfill path so a parent-issued gifticon is treated as complete the
+ * moment it is issued (the child never needs a separate "다 썼어요" step). The
+ * issued secrets (pin/barcode/image) stay readable via the detail endpoint even
+ * after it becomes `used`, so the child can still redeem the code.
  */
 export async function fulfillGifticonOrder(params: {
   orderId: number;
@@ -154,8 +161,9 @@ export async function fulfillGifticonOrder(params: {
   issuedBarcode?: string | null;
   issuedImageUrl?: string | null;
   requireParentId?: number;
+  markUsed?: boolean;
 }): Promise<GifticonOrder | undefined> {
-  const { orderId, issuedPin, issuedBarcode, issuedImageUrl, requireParentId } = params;
+  const { orderId, issuedPin, issuedBarcode, issuedImageUrl, requireParentId, markUsed } = params;
   const conditions = [
     eq(gifticonOrdersTable.id, orderId),
     eq(gifticonOrdersTable.status, "requested"),
@@ -163,14 +171,16 @@ export async function fulfillGifticonOrder(params: {
   if (requireParentId !== undefined) {
     conditions.push(eq(gifticonOrdersTable.parentId, requireParentId));
   }
+  const now = new Date();
   const [order] = await db
     .update(gifticonOrdersTable)
     .set({
-      status: "fulfilled",
+      status: markUsed ? "used" : "fulfilled",
       issuedPin: issuedPin ?? null,
       issuedBarcode: issuedBarcode ?? null,
       issuedImageUrl: issuedImageUrl ?? null,
-      fulfilledAt: new Date(),
+      fulfilledAt: now,
+      ...(markUsed ? { usedAt: now } : {}),
     })
     .where(and(...conditions))
     .returning();
