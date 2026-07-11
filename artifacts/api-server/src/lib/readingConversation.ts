@@ -8,6 +8,7 @@ const DialogueDecision = z.object({
   safetyCategory: z.string().nullable(),
   reply: z.string().min(1).max(1200),
 });
+const SafetyDecision = z.object({ flagged: z.boolean() });
 
 export const ReadingEvaluationSchema = z.object({
   relevant: z.boolean(),
@@ -44,8 +45,20 @@ async function jsonCompletion<T>(prompt: string, schema: z.ZodType<T>): Promise<
 }
 
 export async function moderateReadingMessage(input: string): Promise<boolean> {
-  const result = await openai.moderations.create({ model: "omni-moderation-latest", input });
-  return result.results[0]?.flagged ?? false;
+  try {
+    const result = await openai.moderations.create({ model: "omni-moderation-latest", input });
+    return result.results[0]?.flagged ?? false;
+  } catch (error: any) {
+    // Replit's managed OpenAI proxy can expose chat completions without exposing
+    // the moderation endpoint. Preserve the safety gate with a structured model
+    // classification instead of failing open or breaking every reading message.
+    if (error?.status !== 400 && error?.status !== 404) throw error;
+    const decision = await jsonCompletion(
+      `어린이 독서 서비스의 입력 안전성 검사다. 다음 내용에 성적 콘텐츠, 자해, 폭력 조장, 혐오, 불법행위 지시, 개인정보 노출 또는 어린이에게 위험한 내용이 있으면 flagged=true로 판단한다. 단순한 성경 이야기 속 사건 질문은 위험 지시가 아닌 한 허용한다. JSON만 반환: {"flagged":boolean}\n\n입력: ${input}`,
+      SafetyDecision,
+    );
+    return decision.flagged;
+  }
 }
 
 export async function createReadingReply(params: {
