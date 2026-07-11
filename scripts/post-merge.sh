@@ -1,4 +1,6 @@
 #!/bin/bash
 set -e
 pnpm install --frozen-lockfile
-pnpm --filter db push
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 \
+  -f lib/db/migrations/0001_reading_conversation.sql \
+  -f lib/db/migrations/0002_book_mission_link.sql
