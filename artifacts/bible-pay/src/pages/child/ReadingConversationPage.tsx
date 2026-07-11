@@ -68,7 +68,12 @@ export default function ReadingConversationPage() {
     }).finally(() => setLoading(false));
   }, [book, bookId, chapter, currentChild, mission, missionId, sourceLabel, sourceType, toast, unitId, validSource]);
 
-  useEffect(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), [messages, sending]);
+  useEffect(() => {
+    const target = bottomRef.current;
+    if (target && typeof target.scrollIntoView === "function") {
+      target.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [messages, sending]);
 
   if (appLoading) {
     return <div className="min-h-[100dvh] bg-slate-50 flex items-center justify-center"><Loader2 className="w-7 h-7 animate-spin text-violet-500" /></div>;
