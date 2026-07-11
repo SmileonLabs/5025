@@ -1,4 +1,4 @@
-import { pgTable, serial, text, integer, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, integer, timestamp, boolean } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { parentsTable } from "./parents";
@@ -8,6 +8,11 @@ export const childrenTable = pgTable("children", {
   parentId: integer("parent_id").notNull().references(() => parentsTable.id, { onDelete: "cascade" }),
   name: text("name").notNull(),
   age: integer("age").notNull(),
+  grade: integer("grade"),
+  readingLevel: text("reading_level").notNull().$type<"easy" | "normal" | "advanced">().default("normal"),
+  aiAnswerLength: text("ai_answer_length").notNull().$type<"short" | "normal" | "long">().default("normal"),
+  explainDifficultWords: boolean("explain_difficult_words").notNull().default(true),
+  dailyReadingRetryLimit: integer("daily_reading_retry_limit").notNull().default(3),
   avatar: text("avatar").notNull().default("🌟"),
   pinHash: text("pin_hash").notNull(),
   balance: integer("balance").notNull().default(0),

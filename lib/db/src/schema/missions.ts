@@ -7,8 +7,13 @@ export const missionsTable = pgTable("missions", {
   title: text("title").notNull(),
   description: text("description").notNull().default(""),
   // "bible" = 성경읽기(AI 퀴즈 통과 시 즉시 지급), "activity" = 부모 확인형 활동 미션
-  type: text("type").notNull().$type<"bible" | "activity">(),
+  type: text("type").notNull().$type<"bible" | "activity" | "book">(),
   reward: integer("reward").notNull().default(0),
+  minRewardPoints: integer("min_reward_points").notNull().default(500),
+  maxRewardPoints: integer("max_reward_points").notNull().default(2000),
+  minConversationTurns: integer("min_conversation_turns").notNull().default(2),
+  maxReadingAttemptsPerDay: integer("max_reading_attempts_per_day").notNull().default(3),
+  readingAutoApprove: boolean("reading_auto_approve").notNull().default(true),
   // activity 전용 설정 (bible 미션은 무시)
   scheduleType: text("schedule_type").notNull().$type<"daily" | "once">().default("daily"),
   scheduledDate: date("scheduled_date"), // scheduleType === "once" 일 때 지정일 (YYYY-MM-DD)
