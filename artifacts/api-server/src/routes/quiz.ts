@@ -51,8 +51,8 @@ router.post("/quiz/generate", async (req, res) => {
 
   try {
     const completion = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      max_completion_tokens: 1024,
+      model: "gpt-5-mini",
+      max_completion_tokens: 4096,
       messages: [{ role: "user", content: prompt }],
     });
 

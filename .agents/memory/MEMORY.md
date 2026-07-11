@@ -6,4 +6,5 @@
 - [bible-pay splash vs screenshot](bible-pay-splash-screenshot.md) — app_preview almost always catches the intentional 1.3s SplashScreen (logo only); not a hang — confirm render via console/curl.
 - [bible-pay 레거시 잔액 스케일](bible-pay-legacy-balance-scale.md) — 원→포인트(×10) 전환 후 기존 잔액/보상/주문가는 자동 재평가 안 됨; 운영 데이터 전에 ×10 마이그레이션 결정 필수.
 - [drizzle push TTY 막힘](drizzle-push-tty.md) — push가 인터랙티브 프롬프트로 막히면(--force·yes/script 무용) drizzle 네이밍 규칙에 맞춰 executeSql로 DDL 직접 적용.
+- [bible-pay 미션 제출 동시성](bible-pay-mission-submit-concurrency.md) — activity 제출의 검사후-insert 게이트(중복/횟수)는 (missionId,childId) advisory xact lock으로 직렬화해야 더블탭 초과 지급을 막음.
 - [drizzle pg error code on e.cause](drizzle-pg-error-cause.md) — DrizzleQueryError가 pg 에러를 감싸 code('23505' 등)는 e.cause에 있음; top-level .code 검사는 동시성 경합에서만 드러나는 조용한 500 유발.

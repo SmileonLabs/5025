@@ -14,6 +14,8 @@ export const missionsTable = pgTable("missions", {
   scheduledDate: date("scheduled_date"), // scheduleType === "once" 일 때 지정일 (YYYY-MM-DD)
   timeLimit: text("time_limit"), // "HH:MM" 마감 시각(KST). null이면 제한 없음
   requiresPhoto: boolean("requires_photo").notNull().default(false), // 인증샷 필요 여부
+  // activity 전용: 한 아이가 이 미션을 수행할 수 있는 최대 횟수(승인+대기 누적, 반려 제외). null이면 무제한.
+  maxCompletions: integer("max_completions"),
   // true(기본)면 부모의 모든 아이가 대상(동적). false면 mission_assignments에 명시된 아이만 대상.
   // 불변식: assignToAll=true이면 assignments 행이 없어야 한다.
   assignToAll: boolean("assign_to_all").notNull().default(true),

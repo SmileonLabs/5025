@@ -345,7 +345,11 @@ const ParentFulfillBody = z.object({
     .optional(),
 });
 
-// PATCH /api/gifticons/orders/:id/fulfill — parent marks their child's order sent
+// PATCH /api/gifticons/orders/:id/fulfill — parent issues their child's order.
+// The parent path collapses issuance and redemption: the order goes straight
+// requested → used (markUsed) so a parent-issued gifticon is complete the moment
+// it is issued (no separate child "다 썼어요" step). The issued secrets stay
+// readable via the detail endpoint even after it becomes used.
 router.patch("/gifticons/orders/:id/fulfill", async (req, res) => {
   if (!req.session?.parentId) {
     res.status(401).json({ error: "부모 로그인이 필요해요." });
@@ -368,6 +372,7 @@ router.patch("/gifticons/orders/:id/fulfill", async (req, res) => {
     issuedPin: parsed.data.issuedPin,
     issuedBarcode: parsed.data.issuedBarcode,
     issuedImageUrl: parsed.data.issuedImageUrl,
+    markUsed: true,
   });
   if (!order) {
     res.status(409).json({ error: "발급할 수 없는 주문이에요." });
