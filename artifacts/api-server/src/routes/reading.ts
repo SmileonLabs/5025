@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { and, count, eq, gte, sql } from "drizzle-orm";
+import { and, count, desc, eq, gte, sql } from "drizzle-orm";
 import { z } from "zod/v4";
 import {
   childrenTable, db, missionAssignmentsTable, missionsTable,
@@ -14,6 +14,10 @@ const router = Router();
 function requireChild(req: any, res: any, next: any) {
   if (!req.session?.childId) { res.status(401).json({ error: "아이 로그인이 필요해요." }); return; }
   if (!readingFeatureFlags.conversationEnabled) { res.status(404).json({ error: "독서 대화 기능이 아직 준비 중이에요." }); return; }
+  next();
+}
+function requireParent(req: any, res: any, next: any) {
+  if (!req.session?.parentId) { res.status(401).json({ error: "부모 로그인이 필요해요." }); return; }
   next();
 }
 
@@ -131,6 +135,39 @@ router.get("/reading/attempts/:id", requireChild, async (req, res) => {
   if (!row) { res.status(404).json({ error: "독서 대화를 찾을 수 없어요." }); return; }
   const messages = await db.select().from(readingMessagesTable).where(eq(readingMessagesTable.attemptId, row.attempt.id)).orderBy(readingMessagesTable.createdAt);
   res.json({ ...row.attempt, messages });
+});
+
+router.get("/reading/results", requireParent, async (req, res) => {
+  const childId = req.query.childId == null ? null : Number(req.query.childId);
+  if (childId != null && !Number.isInteger(childId)) { res.status(400).json({ error: "아이 정보를 확인해 주세요." }); return; }
+  const filters = [eq(childrenTable.parentId, req.session.parentId!)];
+  if (childId != null) filters.push(eq(readingAttemptsTable.childId, childId));
+  const rows = await db.select({
+    id: readingAttemptsTable.id, childId: readingAttemptsTable.childId, childName: childrenTable.name,
+    childAvatar: childrenTable.avatar, missionId: readingAttemptsTable.missionId, missionTitle: missionsTable.title,
+    sourceLabel: readingAttemptsTable.sourceLabel, status: readingAttemptsTable.status,
+    rewardPoints: readingAttemptsTable.rewardPoints, evaluationReason: readingAttemptsTable.evaluationReason,
+    evaluation: readingAttemptsTable.evaluation, childMessageCount: readingAttemptsTable.childMessageCount,
+    offTopicCount: readingAttemptsTable.offTopicCount, startedAt: readingAttemptsTable.startedAt,
+    completedAt: readingAttemptsTable.completedAt,
+  }).from(readingAttemptsTable)
+    .innerJoin(childrenTable, eq(readingAttemptsTable.childId, childrenTable.id))
+    .innerJoin(missionsTable, eq(readingAttemptsTable.missionId, missionsTable.id))
+    .where(and(...filters)).orderBy(desc(readingAttemptsTable.startedAt)).limit(200);
+  res.json(rows);
+});
+
+router.get("/reading/results/:id", requireParent, async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id)) { res.status(400).json({ error: "독서 결과를 확인해 주세요." }); return; }
+  const [result] = await db.select({ attempt: readingAttemptsTable, childName: childrenTable.name, childAvatar: childrenTable.avatar, missionTitle: missionsTable.title })
+    .from(readingAttemptsTable).innerJoin(childrenTable, eq(readingAttemptsTable.childId, childrenTable.id))
+    .innerJoin(missionsTable, eq(readingAttemptsTable.missionId, missionsTable.id))
+    .where(and(eq(readingAttemptsTable.id, id), eq(childrenTable.parentId, req.session.parentId!))).limit(1);
+  if (!result) { res.status(404).json({ error: "독서 결과를 찾을 수 없어요." }); return; }
+  const messages = await db.select({ id: readingMessagesTable.id, role: readingMessagesTable.role, content: readingMessagesTable.content, createdAt: readingMessagesTable.createdAt })
+    .from(readingMessagesTable).where(eq(readingMessagesTable.attemptId, id)).orderBy(readingMessagesTable.createdAt);
+  res.json({ ...result.attempt, childName: result.childName, childAvatar: result.childAvatar, missionTitle: result.missionTitle, messages });
 });
 
 export default router;

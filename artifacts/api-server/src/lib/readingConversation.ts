@@ -1,5 +1,6 @@
 import { z } from "zod/v4";
 import { openai } from "@workspace/integrations-openai-ai-server";
+export { pointsForEvaluation } from "./readingRewardPolicy";
 
 const DialogueDecision = z.object({
   relevant: z.boolean(),
@@ -88,13 +89,4 @@ ${transcript}
 JSON만 반환: {"relevant":boolean,"relevanceScore":number,"specificityScore":number,"reasoningScore":number,"selfExpressionScore":number,"followUpScore":number,"reason":string}`,
     ReadingEvaluationSchema,
   );
-}
-
-export function pointsForEvaluation(evaluation: z.infer<typeof ReadingEvaluationSchema>): number {
-  if (!evaluation.relevant || evaluation.relevanceScore === 0) return 0;
-  const total = evaluation.relevanceScore + evaluation.specificityScore + evaluation.reasoningScore + evaluation.selfExpressionScore + evaluation.followUpScore;
-  if (total >= 9) return 2000;
-  if (total >= 7) return 1500;
-  if (total >= 5) return 1000;
-  return 500;
 }
