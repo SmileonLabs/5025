@@ -36,3 +36,8 @@ externalPort = 3000
 channel = "stable-25_05"
 
 [userenv]
+
+[userenv.shared]
+READING_CONVERSATION_ENABLED = "true"
+BOOK_MISSIONS_ENABLED = "true"
+AI_REWARD_AUTO_APPROVE_ENABLED = "true"
