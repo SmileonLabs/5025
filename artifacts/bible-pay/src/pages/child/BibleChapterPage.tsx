@@ -39,7 +39,7 @@ export default function BibleChapterPage() {
 
   const handleChapterSelect = (chapter: number) => {
     if (!selectedBook) return;
-    setLocation(`/child/quiz/${missionId}?book=${encodeURIComponent(selectedBook.name)}&chapter=${chapter}`);
+    setLocation(`/child/reading/${missionId}?book=${encodeURIComponent(selectedBook.name)}&chapter=${chapter}`);
   };
 
   return (
@@ -55,7 +55,7 @@ export default function BibleChapterPage() {
           <h1 className="text-lg font-bold text-gray-900">
             {step === "book" ? "성경 책 선택" : `${selectedBook?.name} — 장 선택`}
           </h1>
-          <p className="text-xs text-gray-400">{mission.title} · +{mission.reward.toLocaleString("ko-KR")}P</p>
+          <p className="text-xs text-gray-400">{mission.title} · 질문에 따라 500~2,000P</p>
         </div>
       </div>
 

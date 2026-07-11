@@ -19,6 +19,11 @@ export interface ChildData {
   balance: number;
   avatar: string;
   parentId: number;
+  grade: number | null;
+  readingLevel: "easy" | "normal" | "advanced";
+  aiAnswerLength: "short" | "normal" | "long";
+  explainDifficultWords: boolean;
+  dailyReadingRetryLimit: number;
 }
 
 export type TransactionType = "mission" | "charge" | "spend" | "gifticon" | "refund";
@@ -62,7 +67,7 @@ type TopupPrepareResponse = TossTopupRequest & {
   provider: "toss";
 };
 
-export type MissionType = "bible" | "activity";
+export type MissionType = "bible" | "activity" | "book";
 export type MissionScheduleType = "daily" | "once";
 
 export interface Mission {
@@ -72,6 +77,9 @@ export interface Mission {
   description: string;
   type: MissionType;
   reward: number;
+  bookId: number | null;
+  minRewardPoints: number;
+  maxRewardPoints: number;
   // activity 전용 메타 (bible은 무시)
   scheduleType: MissionScheduleType;
   scheduledDate: string | null;
@@ -345,7 +353,7 @@ export function AppProvider({ children: reactChildren }: { children: ReactNode }
           setMissionLogs(logs);
         } else if (me.role === "child") {
           setRole("child");
-          setCurrentChild({ id: me.id, name: me.name, age: me.age, avatar: me.avatar, balance: me.balance, parentId: me.parentId });
+          setCurrentChild(me);
           const [txs, missionList, catalog, orders, logs] = await Promise.all([
             api.get<Transaction[]>("/transactions"),
             api.get<Mission[]>("/missions"),

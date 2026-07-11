@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { z } from "zod";
-import { db, missionsTable, missionLogsTable, missionAssignmentsTable, childrenTable, transactionsTable } from "@workspace/db";
+import { db, missionsTable, missionLogsTable, missionAssignmentsTable, childrenTable, transactionsTable, booksTable } from "@workspace/db";
 import { eq, and, desc, inArray, sql, or, exists } from "drizzle-orm";
 import { sendPushToParent } from "../lib/push";
 import { grantBibleReward, approveActivityLog } from "../lib/missionReward";
@@ -27,7 +27,8 @@ const MissionFields = z.object({
   title: z.string().min(1).max(100),
   description: z.string().max(500).default(""),
   // "bible" = 성경읽기(즉시 지급), "activity" = 부모 확인형 활동 미션
-  type: z.enum(["bible", "activity"]),
+  type: z.enum(["bible", "activity", "book"]),
+  bookId: z.number().int().positive().nullable().optional(),
   reward: z.number().int().min(0).max(100000),
   // activity 전용 (bible은 무시)
   scheduleType: z.enum(["daily", "once"]).default("daily"),
@@ -58,6 +59,9 @@ const CreateMissionBody = MissionFields.refine(
 ).refine(
   (v) => v.assignToAll || (v.childIds != null && v.childIds.length > 0),
   { message: "대상 아이를 선택해주세요.", path: ["childIds"] },
+).refine(
+  (v) => v.type !== "book" || v.bookId != null,
+  { message: "일반도서 미션에는 책을 선택해주세요.", path: ["bookId"] },
 );
 const UpdateMissionBody = MissionFields.partial().refine(
   (v) => v.scheduleType !== "once" || v.scheduledDate != null,
@@ -147,6 +151,12 @@ router.post("/missions", requireParent, async (req, res) => {
   if (!parsed.success) { res.status(400).json({ error: parsed.error.issues[0]?.message ?? "입력값을 확인해주세요." }); return; }
   const parentId = req.session.parentId!;
   const { childIds, assignToAll, ...missionData } = parsed.data;
+  if (missionData.type === "book") {
+    const [book] = await db.select({ id: booksTable.id }).from(booksTable).where(and(eq(booksTable.id, missionData.bookId!), eq(booksTable.parentId, parentId), eq(booksTable.verifiedByParent, true))).limit(1);
+    if (!book) { res.status(400).json({ error: "확인된 도서를 선택해 주세요." }); return; }
+  } else {
+    missionData.bookId = null;
+  }
   // maxCompletions(수행 횟수 제한)는 매일(daily) 활동(activity) 미션에만 의미 있음 — 그 외엔 null로 정규화.
   if (missionData.type !== "activity" || missionData.scheduleType !== "daily") {
     missionData.maxCompletions = null;

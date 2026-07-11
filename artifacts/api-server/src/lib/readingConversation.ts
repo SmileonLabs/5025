@@ -1,0 +1,92 @@
+import { z } from "zod/v4";
+import { openai } from "@workspace/integrations-openai-ai-server";
+export { pointsForEvaluation } from "./readingRewardPolicy";
+
+const DialogueDecision = z.object({
+  relevant: z.boolean(),
+  shouldEnd: z.boolean(),
+  safetyCategory: z.string().nullable(),
+  reply: z.string().min(1).max(1200),
+});
+
+export const ReadingEvaluationSchema = z.object({
+  relevant: z.boolean(),
+  relevanceScore: z.number().int().min(0).max(2),
+  specificityScore: z.number().int().min(0).max(2),
+  reasoningScore: z.number().int().min(0).max(2),
+  selfExpressionScore: z.number().int().min(0).max(2),
+  followUpScore: z.number().int().min(0).max(2),
+  reason: z.string().min(1).max(500),
+});
+
+type ReadingProfile = {
+  age: number;
+  grade: number | null;
+  readingLevel: "easy" | "normal" | "advanced";
+  aiAnswerLength: "short" | "normal" | "long";
+  explainDifficultWords: boolean;
+};
+
+type ConversationMessage = { role: "child" | "assistant"; content: string };
+
+function profileInstruction(profile: ReadingProfile): string {
+  return `아이는 ${profile.age}세${profile.grade ? `, ${profile.grade}학년` : ""}이고 독서 수준은 ${profile.readingLevel}이다. 답변 길이는 ${profile.aiAnswerLength}이며 어려운 단어 설명은 ${profile.explainDifficultWords ? "제공" : "최소화"}한다.`;
+}
+
+async function jsonCompletion<T>(prompt: string, schema: z.ZodType<T>): Promise<T> {
+  const completion = await openai.chat.completions.create({
+    model: process.env.READING_AI_MODEL ?? "gpt-5-mini",
+    max_completion_tokens: 1200,
+    response_format: { type: "json_object" },
+    messages: [{ role: "system", content: prompt }],
+  });
+  return schema.parse(JSON.parse(completion.choices[0]?.message?.content ?? "{}"));
+}
+
+export async function moderateReadingMessage(input: string): Promise<boolean> {
+  const result = await openai.moderations.create({ model: "omni-moderation-latest", input });
+  return result.results[0]?.flagged ?? false;
+}
+
+export async function createReadingReply(params: {
+  sourceLabel: string;
+  readingSummary?: string;
+  profile: ReadingProfile;
+  messages: ConversationMessage[];
+}) {
+  const transcript = params.messages.map((m) => `${m.role === "child" ? "아이" : "AI"}: ${m.content}`).join("\n");
+  return jsonCompletion(
+    `너는 어린이 독서 대화 선생님이다. ${profileInstruction(params.profile)}
+읽은 범위: ${params.sourceLabel}
+아이 요약: ${params.readingSummary ?? "없음"}
+대화:
+${transcript}
+
+마지막 아이 질문이 읽은 범위나 아이가 설명한 내용과 관련되는지 판단한다.
+- 무관하면 정답을 제공하지 말고 읽은 내용에서 질문하도록 다정하게 유도한다.
+- 관련되면 아이 수준에 맞게 답하고 한 번에 후속 질문 하나만 한다.
+- 책에 없는 내용을 아는 척하거나 만들어내지 않는다.
+- 위험하거나 부적절한 내용은 안전하게 경계를 설명하고 보호자에게 말하도록 안내한다.
+JSON만 반환: {"relevant":boolean,"shouldEnd":boolean,"safetyCategory":string|null,"reply":string}`,
+    DialogueDecision,
+  );
+}
+
+export async function evaluateReadingConversation(params: {
+  sourceLabel: string;
+  profile: ReadingProfile;
+  messages: ConversationMessage[];
+}) {
+  const transcript = params.messages.map((m) => `${m.role === "child" ? "아이" : "AI"}: ${m.content}`).join("\n");
+  return jsonCompletion(
+    `어린이 독서 대화 평가자다. ${profileInstruction(params.profile)}
+읽은 범위: ${params.sourceLabel}
+대화:
+${transcript}
+
+나이에 맞춰 공정하게 평가한다. 읽은 내용과 관련된 아이 질문이 없거나 무의미한 반복뿐이면 relevant=false이며 모든 점수는 0이다.
+각 점수는 0~2 정수다: 관련성, 구체성, 이유를 생각함, 자기표현, 후속질문.
+JSON만 반환: {"relevant":boolean,"relevanceScore":number,"specificityScore":number,"reasoningScore":number,"selfExpressionScore":number,"followUpScore":number,"reason":string}`,
+    ReadingEvaluationSchema,
+  );
+}

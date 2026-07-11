@@ -9,3 +9,5 @@ export * from "./requests";
 export * from "./pushSubscriptions";
 export * from "./gifticonOrders";
 export * from "./gifticonCatalogItems";
+export * from "./books";
+export * from "./readingAttempts";

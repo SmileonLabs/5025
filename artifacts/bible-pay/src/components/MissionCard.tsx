@@ -13,6 +13,7 @@ interface MissionCardProps {
 const TYPE_INFO: Record<Mission["type"], { emoji: string; label: string; color: string; btnColor: string }> = {
   bible:    { emoji: "📖", label: "성경읽기", color: "bg-blue-50 text-blue-700 border-blue-200",     btnColor: "bg-blue-500 hover:bg-blue-600 text-white" },
   activity: { emoji: "🔍", label: "활동미션", color: "bg-orange-50 text-orange-700 border-orange-200", btnColor: "bg-orange-500 hover:bg-orange-600 text-white" },
+  book:     { emoji: "📚", label: "일반도서", color: "bg-violet-50 text-violet-700 border-violet-200", btnColor: "bg-violet-500 hover:bg-violet-600 text-white" },
 };
 
 function scheduleLabel(m: Mission): string {
@@ -80,6 +81,10 @@ export function MissionCard({ mission, childId }: MissionCardProps) {
       setLocation(`/child/bible/${mission.id}`);
       return;
     }
+    if (mission.type === "book") {
+      setLocation(`/child/book/${mission.id}`);
+      return;
+    }
 
     // activity
     if (mission.requiresPhoto && !file) {
@@ -114,7 +119,7 @@ export function MissionCard({ mission, childId }: MissionCardProps) {
           </div>
         </div>
         <div className="bg-yellow-50 text-yellow-700 px-3 py-1 rounded-full text-sm font-bold border border-yellow-200 shrink-0">
-          +{mission.reward.toLocaleString("ko-KR")}P
+          {mission.type === "activity" ? `+${mission.reward.toLocaleString("ko-KR")}P` : `${mission.minRewardPoints ?? 500}~${mission.maxRewardPoints ?? 2000}P`}
         </div>
       </div>
 
@@ -149,8 +154,11 @@ export function MissionCard({ mission, childId }: MissionCardProps) {
 
       {mission.type === "bible" && !done && (
         <p className="text-xs text-gray-500 mb-3 bg-blue-50 rounded-xl px-3 py-2">
-          📚 성경 책과 장을 선택하면 AI가 퀴즈 2문제를 내요. 전부 맞히면 용돈 지급!
+          📖 읽은 장을 고른 뒤 AI와 궁금한 점을 대화해요. 질문의 깊이에 따라 500~2,000P를 받아요.
         </p>
+      )}
+      {mission.type === "book" && !done && (
+        <p className="text-xs text-gray-500 mb-3 bg-violet-50 rounded-xl px-3 py-2">📚 읽은 목차를 고르고 AI와 궁금한 점을 대화해요. 관련 없는 질문은 완료되지 않아요.</p>
       )}
 
       {/* 인증샷 선택 / 미리보기 (activity & 제출 전) */}
@@ -214,7 +222,7 @@ export function MissionCard({ mission, childId }: MissionCardProps) {
             data-testid={`mission-action-btn-${mission.id}`}
           >
             {loading && <Loader2 className="w-4 h-4 animate-spin" />}
-            {mission.type === "bible" ? "📖 성경책 선택하기" : "✅ 완료했어요!"}
+              {mission.type === "bible" ? "📖 읽은 성경 장 선택하기" : mission.type === "book" ? "📚 읽은 목차 선택하기" : "✅ 완료했어요!"}
           </button>
         )
       )}

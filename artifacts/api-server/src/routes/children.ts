@@ -2,7 +2,7 @@ import { Router } from "express";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { db, childrenTable, parentsTable, transactionsTable } from "@workspace/db";
-import { eq, desc } from "drizzle-orm";
+import { and, eq, desc } from "drizzle-orm";
 
 const router = Router();
 
@@ -11,7 +11,30 @@ const CreateChildBody = z.object({
   age: z.number().int().min(1).max(18),
   avatar: z.string().min(1),
   pin: z.string().length(4).regex(/^\d{4}$/),
+  grade: z.number().int().min(1).max(12).nullable().optional(),
+  readingLevel: z.enum(["easy", "normal", "advanced"]).optional(),
+  aiAnswerLength: z.enum(["short", "normal", "long"]).optional(),
+  explainDifficultWords: z.boolean().optional(),
+  dailyReadingRetryLimit: z.number().int().min(1).max(10).optional(),
 });
+
+const UpdateReadingProfileBody = z.object({
+  grade: z.number().int().min(1).max(12).nullable().optional(),
+  readingLevel: z.enum(["easy", "normal", "advanced"]).optional(),
+  aiAnswerLength: z.enum(["short", "normal", "long"]).optional(),
+  explainDifficultWords: z.boolean().optional(),
+  dailyReadingRetryLimit: z.number().int().min(1).max(10).optional(),
+}).refine((value) => Object.keys(value).length > 0, "At least one setting is required.");
+
+function publicChild(child: typeof childrenTable.$inferSelect) {
+  return {
+    id: child.id, name: child.name, age: child.age, grade: child.grade,
+    readingLevel: child.readingLevel, aiAnswerLength: child.aiAnswerLength,
+    explainDifficultWords: child.explainDifficultWords,
+    dailyReadingRetryLimit: child.dailyReadingRetryLimit,
+    avatar: child.avatar, balance: child.balance, parentId: child.parentId,
+  };
+}
 
 function requireParent(req: any, res: any, next: any) {
   if (!req.session?.parentId) {
@@ -27,7 +50,7 @@ router.get("/children", requireParent, async (req, res) => {
     .select()
     .from(childrenTable)
     .where(eq(childrenTable.parentId, req.session.parentId!));
-  res.json(children.map(c => ({ id: c.id, name: c.name, age: c.age, avatar: c.avatar, balance: c.balance, parentId: c.parentId })));
+  res.json(children.map(publicChild));
 });
 
 // GET /api/children/public — list children (name + id only) for child login — no auth required
@@ -53,13 +76,32 @@ router.post("/children", requireParent, async (req, res) => {
     res.status(400).json({ error: "입력값을 확인해주세요.", details: parsed.error.issues });
     return;
   }
-  const { name, age, avatar, pin } = parsed.data;
+  const { name, age, avatar, pin, ...readingProfile } = parsed.data;
   const pinHash = await bcrypt.hash(pin, 12);
   const [child] = await db
     .insert(childrenTable)
-    .values({ parentId: req.session.parentId!, name, age, avatar, pinHash, balance: 0 })
+    .values({ parentId: req.session.parentId!, name, age, avatar, pinHash, balance: 0, ...readingProfile })
     .returning();
-  res.status(201).json({ id: child.id, name: child.name, age: child.age, avatar: child.avatar, balance: child.balance, parentId: child.parentId });
+  res.status(201).json(publicChild(child));
+});
+
+// PATCH /api/children/:id/reading-profile - parent-controlled AI reading level.
+router.patch("/children/:id/reading-profile", requireParent, async (req, res) => {
+  const id = Number(req.params.id);
+  const parsed = UpdateReadingProfileBody.safeParse(req.body);
+  if (!Number.isInteger(id) || !parsed.success) {
+    res.status(400).json({ error: "독서 수준 설정을 확인해 주세요." });
+    return;
+  }
+  const [child] = await db.update(childrenTable)
+    .set(parsed.data)
+    .where(and(eq(childrenTable.id, id), eq(childrenTable.parentId, req.session.parentId!)))
+    .returning();
+  if (!child) {
+    res.status(404).json({ error: "아이 계정을 찾을 수 없어요." });
+    return;
+  }
+  res.json(publicChild(child));
 });
 
 // DELETE /api/children/:id
