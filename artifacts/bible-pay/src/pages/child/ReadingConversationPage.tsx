@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
-import { useLocation, useParams, useSearch } from "wouter";
+import { useLocation, useParams } from "wouter";
 import { ChevronLeft, Loader2, Send, Sparkles } from "lucide-react";
 import { api } from "@/lib/api";
 import { useAppContext } from "@/context/AppContext";
@@ -24,7 +24,10 @@ type CompleteResponse = {
 export default function ReadingConversationPage() {
   const [, setLocation] = useLocation();
   const params = useParams<{ missionId: string }>();
-  const search = new URLSearchParams(useSearch());
+  // Read the query directly from the browser. The production router can render
+  // this route before wouter's search hook is available, which previously
+  // crashed the component and left only a blank page.
+  const search = new URLSearchParams(window.location.search);
   const { role, currentChild, missions, loading: appLoading } = useAppContext();
   const { toast } = useToast();
   const missionId = Number(params.missionId);
