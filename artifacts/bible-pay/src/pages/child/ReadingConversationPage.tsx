@@ -25,7 +25,7 @@ export default function ReadingConversationPage() {
   const [, setLocation] = useLocation();
   const params = useParams<{ missionId: string }>();
   const search = new URLSearchParams(useSearch());
-  const { currentChild, missions, loading: appLoading } = useAppContext();
+  const { role, currentChild, missions, loading: appLoading } = useAppContext();
   const { toast } = useToast();
   const missionId = Number(params.missionId);
   const mission = missions.find((item) => item.id === missionId);
@@ -67,14 +67,36 @@ export default function ReadingConversationPage() {
 
   useEffect(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), [messages, sending]);
 
-  useEffect(() => {
-    if (!appLoading && !currentChild) setLocation("/login");
-  }, [appLoading, currentChild, setLocation]);
-
   if (appLoading) {
     return <div className="min-h-[100dvh] bg-slate-50 flex items-center justify-center"><Loader2 className="w-7 h-7 animate-spin text-violet-500" /></div>;
   }
-  if (!currentChild) return null;
+  if (!currentChild) {
+    return (
+      <div className="min-h-[100dvh] bg-slate-50 flex items-center justify-center p-6">
+        <section className="bg-white rounded-3xl border p-6 text-center max-w-sm w-full shadow-sm">
+          <p className="text-4xl mb-3">🔐</p>
+          <h1 className="font-black text-lg">아이 로그인이 필요해요</h1>
+          <p className="text-sm text-gray-500 mt-2 leading-relaxed">
+            {role === "parent"
+              ? "현재 부모 계정으로 로그인되어 있어요. 아이 계정으로 다시 로그인한 뒤 독서 대화를 시작해 주세요."
+              : "로그인 정보가 만료되었거나 확인되지 않았어요. 아이 계정으로 다시 로그인해 주세요."}
+          </p>
+          <button
+            onClick={() => setLocation("/child/select")}
+            className="mt-5 w-full rounded-xl bg-violet-500 text-white py-3 font-bold"
+          >
+            아이로 로그인
+          </button>
+          <button
+            onClick={() => window.location.reload()}
+            className="mt-2 w-full rounded-xl bg-gray-100 text-gray-700 py-3 font-bold"
+          >
+            로그인 상태 다시 확인
+          </button>
+        </section>
+      </div>
+    );
+  }
   if (!mission || !validSource) {
     return <div className="min-h-[100dvh] bg-slate-50 flex items-center justify-center p-6"><section className="bg-white rounded-3xl border p-6 text-center max-w-sm w-full"><p className="text-3xl mb-3">📖</p><h1 className="font-black text-lg">읽기 정보를 찾지 못했어요</h1><p className="text-sm text-gray-500 mt-2">미션 목록으로 돌아가 다시 선택해 주세요.</p><button onClick={() => setLocation("/child/missions")} className="mt-5 w-full rounded-xl bg-gray-900 text-white py-3 font-bold">미션으로 돌아가기</button></section></div>;
   }
