@@ -10,8 +10,9 @@ import { MissionLogDetailModal } from "@/components/MissionLogDetailModal";
 import { apiUrl } from "@/lib/api";
 
 const TYPE_LABELS: Record<Mission["type"], { label: string; emoji: string; desc: string; color: string }> = {
-  bible:    { label: "성경읽기", emoji: "📖", desc: "책과 장을 선택 → AI 퀴즈 2문제 통과 시 즉시 지급", color: "bg-blue-50 text-blue-700 border-blue-200" },
+  bible:    { label: "성경읽기", emoji: "📖", desc: "읽은 장을 선택 → AI와 질문 대화 후 500~2,000P 지급", color: "bg-blue-50 text-blue-700 border-blue-200" },
   activity: { label: "활동미션", emoji: "🔍", desc: "아이가 완료(인증샷)하면 부모님이 확인 후 지급", color: "bg-orange-50 text-orange-700 border-orange-200" },
+  book:     { label: "일반도서", emoji: "📚", desc: "ISBN과 목차를 부모가 확인 → AI와 질문 대화 후 차등 지급", color: "bg-violet-50 text-violet-700 border-violet-200" },
 };
 
 function todayKst(): string {
