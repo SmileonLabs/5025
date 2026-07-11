@@ -67,7 +67,7 @@ type TopupPrepareResponse = TossTopupRequest & {
   provider: "toss";
 };
 
-export type MissionType = "bible" | "activity";
+export type MissionType = "bible" | "activity" | "book";
 export type MissionScheduleType = "daily" | "once";
 
 export interface Mission {
@@ -77,6 +77,9 @@ export interface Mission {
   description: string;
   type: MissionType;
   reward: number;
+  bookId: number | null;
+  minRewardPoints: number;
+  maxRewardPoints: number;
   // activity 전용 메타 (bible은 무시)
   scheduleType: MissionScheduleType;
   scheduledDate: string | null;

@@ -16,6 +16,7 @@ import ChargePage from "@/pages/parent/ChargePage";
 import ParentMissionsPage from "@/pages/parent/MissionsPage";
 import HistoryPage from "@/pages/parent/HistoryPage";
 import ParentGifticonsPage from "@/pages/parent/GifticonsPage";
+import ParentBooksPage from "@/pages/parent/BooksPage";
 import HomePage from "@/pages/child/HomePage";
 import MissionsPage from "@/pages/child/MissionsPage";
 import LedgerPage from "@/pages/child/LedgerPage";
@@ -23,6 +24,7 @@ import SettingsPage from "@/pages/child/SettingsPage";
 import BibleChapterPage from "@/pages/child/BibleChapterPage";
 import QuizPage from "@/pages/child/QuizPage";
 import ReadingConversationPage from "@/pages/child/ReadingConversationPage";
+import BookUnitsPage from "@/pages/child/BookUnitsPage";
 import ShopPage from "@/pages/child/ShopPage";
 import AdminPage from "@/pages/AdminPage";
 
@@ -42,6 +44,7 @@ function Router() {
       <Route path="/parent/missions" component={ParentMissionsPage} />
       <Route path="/parent/history" component={HistoryPage} />
       <Route path="/parent/gifticons" component={ParentGifticonsPage} />
+      <Route path="/parent/books" component={ParentBooksPage} />
 
       <Route path="/child/home" component={HomePage} />
       <Route path="/child/missions" component={MissionsPage} />
@@ -51,6 +54,7 @@ function Router() {
       <Route path="/child/bible/:missionId" component={BibleChapterPage} />
       <Route path="/child/quiz/:missionId" component={QuizPage} />
       <Route path="/child/reading/:missionId" component={ReadingConversationPage} />
+      <Route path="/child/book/:missionId" component={BookUnitsPage} />
 
       <Route path="/admin" component={AdminPage} />
 

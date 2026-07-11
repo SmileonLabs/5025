@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
-import { Plus, ChevronRight, LogOut, UserPlus, PlusCircle, ClipboardList, Gift, Check, X, Settings2 } from "lucide-react";
+import { Plus, ChevronRight, LogOut, UserPlus, PlusCircle, ClipboardList, Gift, Check, X, Settings2, BookOpen } from "lucide-react";
 import { useAppContext, type ChildData } from "@/context/AppContext";
 import { Button } from "@/components/ui/button";
 import { BibleIllustration } from "@/components/BibleIllustration";
@@ -130,6 +130,7 @@ export default function DashboardPage() {
           >
             <UserPlus className="w-5 h-5" />
           </Button>
+          <Button onClick={() => setLocation("/parent/books")} variant="outline" className="h-[52px] px-4 rounded-[16px] font-bold border-gray-200" aria-label="일반도서 등록"><BookOpen className="w-5 h-5" /></Button>
         </div>
       </div>
 

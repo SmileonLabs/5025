@@ -29,9 +29,15 @@ export default function ReadingConversationPage() {
   const { toast } = useToast();
   const missionId = Number(params.missionId);
   const mission = missions.find((item) => item.id === missionId);
+  const sourceType = search.get("type") === "book" ? "book" : "bible";
   const book = search.get("book") ?? "";
   const chapter = Number(search.get("chapter"));
-  const sourceLabel = `${book} ${chapter}장`;
+  const bookId = Number(search.get("bookId"));
+  const unitId = Number(search.get("unitId"));
+  const unitTitle = search.get("title") ?? "";
+  const validSource = sourceType === "book" ? Number.isInteger(bookId) && bookId > 0 && Number.isInteger(unitId) && unitId > 0 && !!unitTitle : !!book && Number.isInteger(chapter) && chapter > 0;
+  const sourceLabel = sourceType === "book" ? unitTitle : `${book} ${chapter}장`;
+  const backPath = sourceType === "book" ? `/child/book/${missionId}` : `/child/bible/${missionId}`;
   const [attemptId, setAttemptId] = useState<number | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
@@ -43,11 +49,11 @@ export default function ReadingConversationPage() {
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!currentChild || !mission || !book || !Number.isInteger(chapter) || chapter < 1 || started.current) return;
+    if (!currentChild || !mission || !validSource || started.current) return;
     started.current = true;
     api.post<AttemptResponse>("/reading/attempts", {
       missionId,
-      readingUnitKey: `bible:${book}:${chapter}`,
+      readingUnitKey: sourceType === "book" ? `book:${bookId}:${unitId}` : `bible:${book}:${chapter}`,
       sourceLabel,
     }).then((data) => {
       setAttemptId(data.attempt.id);
@@ -55,13 +61,13 @@ export default function ReadingConversationPage() {
     }).catch((error) => {
       toast({ title: error.message, variant: "destructive" });
     }).finally(() => setLoading(false));
-  }, [book, chapter, currentChild, mission, missionId, sourceLabel, toast]);
+  }, [book, bookId, chapter, currentChild, mission, missionId, sourceLabel, sourceType, toast, unitId, validSource]);
 
   useEffect(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), [messages, sending]);
 
   if (!currentChild) { setLocation("/login"); return null; }
-  if (!mission || !book || !Number.isInteger(chapter) || chapter < 1) {
-    setLocation(`/child/bible/${missionId}`);
+  if (!mission || !validSource) {
+    setLocation(backPath);
     return null;
   }
 
@@ -105,7 +111,7 @@ export default function ReadingConversationPage() {
   return (
     <div className="min-h-[100dvh] bg-slate-50 flex flex-col">
       <header className="bg-white border-b px-4 py-3 flex items-center gap-3 sticky top-0 z-20">
-        <button onClick={() => setLocation(`/child/bible/${missionId}`)} className="p-2 rounded-full hover:bg-gray-100" aria-label="뒤로 가기"><ChevronLeft className="w-5 h-5" /></button>
+        <button onClick={() => setLocation(backPath)} className="p-2 rounded-full hover:bg-gray-100" aria-label="뒤로 가기"><ChevronLeft className="w-5 h-5" /></button>
         <div className="flex-1"><h1 className="font-bold text-gray-900">AI와 독서 대화</h1><p className="text-xs text-gray-500">{sourceLabel} · 좋은 질문은 500~2,000P</p></div>
         <Sparkles className="w-5 h-5 text-violet-500" />
       </header>
@@ -124,7 +130,7 @@ export default function ReadingConversationPage() {
             <p className="text-3xl mb-2">{result.status === "completed" ? "🎉" : "🌱"}</p>
             <h2 className="font-black text-lg">{result.status === "completed" ? `+${result.rewardPoints.toLocaleString("ko-KR")}P 받았어요!` : "아직 미션 완료가 아니에요"}</h2>
             <p className="text-sm text-gray-600 mt-2">{result.evaluation.reason}</p>
-            <button onClick={() => setLocation(result.status === "completed" ? "/child/missions" : `/child/bible/${missionId}`)} className="mt-4 w-full rounded-xl bg-gray-900 text-white py-3 font-bold">{result.status === "completed" ? "미션으로 돌아가기" : "다시 읽고 도전하기"}</button>
+            <button onClick={() => setLocation(result.status === "completed" ? "/child/missions" : backPath)} className="mt-4 w-full rounded-xl bg-gray-900 text-white py-3 font-bold">{result.status === "completed" ? "미션으로 돌아가기" : "다시 읽고 도전하기"}</button>
           </section>
         )}
         <div ref={bottomRef} />
