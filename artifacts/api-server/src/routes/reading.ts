@@ -57,7 +57,13 @@ router.post("/reading/attempts", requireChild, async (req, res) => {
   const limit = Math.min(child.dailyReadingRetryLimit, mission.maxReadingAttemptsPerDay);
   if (Number(attemptsToday) >= limit) { res.status(429).json({ error: `오늘은 ${limit}번까지 도전할 수 있어요.` }); return; }
 
-  const [attempt] = await db.insert(readingAttemptsTable).values({ childId, missionId: mission.id, ...parsed.data }).returning();
+  const [attempt] = await db.insert(readingAttemptsTable).values({
+    childId,
+    missionId: mission.id,
+    readingUnitKey: parsed.data.readingUnitKey,
+    sourceLabel: parsed.data.sourceLabel,
+    readingSummary: parsed.data.readingSummary,
+  }).returning();
   const opening = `오늘 읽은 ${parsed.data.sourceLabel}에서 가장 궁금했던 일이나 “왜 그랬을까?”라고 생각한 것을 이야기해 줄래?`;
   await db.insert(readingMessagesTable).values({ attemptId: attempt.id, role: "assistant", content: opening });
   res.status(201).json({ attempt, message: { role: "assistant", content: opening } });
