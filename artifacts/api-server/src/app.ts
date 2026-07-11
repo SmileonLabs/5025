@@ -1,4 +1,5 @@
 import express, { type Express } from "express";
+import { randomUUID } from "node:crypto";
 import cors from "cors";
 import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
@@ -7,8 +8,11 @@ import { pool } from "@workspace/db";
 import router from "./routes";
 import { logger } from "./lib/logger";
 import { WebhookHandlers } from "./webhookHandlers";
+import { isAllowedOrigin, requireProductionSecurityConfig } from "./lib/security";
 
 const PgSession = connectPgSimple(session);
+
+requireProductionSecurityConfig();
 
 const app: Express = express();
 
@@ -26,7 +30,16 @@ app.use(
   }),
 );
 
-app.use(cors({ origin: true, credentials: true }));
+app.set("trust proxy", 1);
+app.disable("x-powered-by");
+app.use(
+  cors({
+    credentials: true,
+    origin(origin, callback) {
+      callback(isAllowedOrigin(origin) ? null : new Error("Origin is not allowed by CORS."), Boolean(origin));
+    },
+  }),
+);
 
 // Stripe webhook must receive the raw body, so register it BEFORE express.json().
 app.post(
@@ -55,13 +68,14 @@ app.use(express.urlencoded({ extended: true }));
 app.use(
   session({
     store: new PgSession({ pool, createTableIfMissing: true }),
-    secret: process.env["SESSION_SECRET"] ?? "dev-secret",
+    secret: process.env["SESSION_SECRET"] ?? randomUUID(),
     resave: false,
     saveUninitialized: false,
     cookie: {
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
       httpOnly: true,
       sameSite: "lax",
+      secure: process.env["NODE_ENV"] === "production",
     },
   }),
 );

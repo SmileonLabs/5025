@@ -12,37 +12,64 @@ export class PaymentProviderError extends Error {
 }
 
 export function getTossClientKey(): string {
-  return process.env["TOSS_CLIENT_KEY"] ?? DEFAULT_TOSS_CLIENT_KEY;
+  const configured = process.env["TOSS_CLIENT_KEY"];
+  if (configured) return configured;
+  if (process.env["NODE_ENV"] === "production") throw new Error("TOSS_CLIENT_KEY is required in production.");
+  return DEFAULT_TOSS_CLIENT_KEY;
 }
+
+function getTossSecretKey(): string {
+  const configured = process.env["TOSS_SECRET_KEY"];
+  if (configured) return configured;
+  if (process.env["NODE_ENV"] === "production") throw new Error("TOSS_SECRET_KEY is required in production.");
+  return DEFAULT_TOSS_SECRET_KEY;
+}
+
+function authorizationHeader(): string {
+  return `Basic ${Buffer.from(`${getTossSecretKey()}:`).toString("base64")}`;
+}
+
+export type TossPayment = {
+  paymentKey?: string;
+  orderId?: string;
+  status?: string;
+  totalAmount?: number;
+  code?: string;
+  message?: string;
+};
 
 export async function confirmTossPayment(params: {
   paymentKey: string;
   orderId: string;
   amount: number;
 }) {
-  const secretKey = process.env["TOSS_SECRET_KEY"] ?? DEFAULT_TOSS_SECRET_KEY;
   const res = await fetch("https://api.tosspayments.com/v1/payments/confirm", {
     method: "POST",
     headers: {
-      Authorization: `Basic ${Buffer.from(`${secretKey}:`).toString("base64")}`,
+      Authorization: authorizationHeader(),
       "Content-Type": "application/json",
       "Idempotency-Key": params.orderId,
     },
     body: JSON.stringify(params),
   });
 
-  const data = (await res.json()) as {
-    paymentKey?: string;
-    orderId?: string;
-    status?: string;
-    totalAmount?: number;
-    code?: string;
-    message?: string;
-  };
+  const data = (await res.json()) as TossPayment;
 
   if (!res.ok) {
     throw new PaymentProviderError(res.status, data.message ?? "Toss Payments confirmation failed.", data.code);
   }
 
+  return data;
+}
+
+/** Re-query Toss before trusting an asynchronous webhook payload. */
+export async function getTossPayment(paymentKey: string): Promise<TossPayment> {
+  const res = await fetch(`https://api.tosspayments.com/v1/payments/${encodeURIComponent(paymentKey)}`, {
+    headers: { Authorization: authorizationHeader() },
+  });
+  const data = (await res.json()) as TossPayment;
+  if (!res.ok) {
+    throw new PaymentProviderError(res.status, data.message ?? "Toss Payments lookup failed.", data.code);
+  }
   return data;
 }

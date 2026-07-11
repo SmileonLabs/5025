@@ -1,10 +1,17 @@
-import { Router } from "express";
+import { Router, type Request } from "express";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { db, parentsTable, childrenTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
+import { rateLimit } from "../lib/security";
 
 const router = Router();
+const passwordAuthLimit = rateLimit({ prefix: "password-auth", windowMs: 15 * 60_000, max: 10 });
+const childPinLimit = rateLimit({ prefix: "child-pin", windowMs: 15 * 60_000, max: 6 });
+
+function regenerateSession(req: Request): Promise<void> {
+  return new Promise((resolve, reject) => req.session.regenerate((err) => (err ? reject(err) : resolve())));
+}
 
 const SignupBody = z.object({
   name: z.string().min(1).max(50),
@@ -23,7 +30,7 @@ const ChildPinBody = z.object({
 });
 
 // POST /api/auth/signup
-router.post("/auth/signup", async (req, res) => {
+router.post("/auth/signup", passwordAuthLimit, async (req, res) => {
   const parsed = SignupBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "입력값을 확인해주세요.", details: parsed.error.issues });
@@ -40,15 +47,21 @@ router.post("/auth/signup", async (req, res) => {
   const passwordHash = await bcrypt.hash(password, 12);
   const [parent] = await db
     .insert(parentsTable)
-    .values({ name, email, passwordHash, balance: 50000 })
+    .values({
+      name,
+      email,
+      passwordHash,
+      balance: process.env["NODE_ENV"] === "production" ? 0 : Number(process.env["DEV_SIGNUP_BALANCE"] ?? 50000),
+    })
     .returning();
 
+  await regenerateSession(req);
   req.session.parentId = parent.id;
   res.json({ id: parent.id, name: parent.name, email: parent.email, balance: parent.balance });
 });
 
 // POST /api/auth/login
-router.post("/auth/login", async (req, res) => {
+router.post("/auth/login", passwordAuthLimit, async (req, res) => {
   const parsed = LoginBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "이메일과 비밀번호를 입력해주세요." });
@@ -68,13 +81,14 @@ router.post("/auth/login", async (req, res) => {
     return;
   }
 
+  await regenerateSession(req);
   req.session.parentId = parent.id;
   req.session.childId = undefined;
   res.json({ id: parent.id, name: parent.name, email: parent.email, balance: parent.balance });
 });
 
 // POST /api/auth/child-login
-router.post("/auth/child-login", async (req, res) => {
+router.post("/auth/child-login", childPinLimit, async (req, res) => {
   const parsed = ChildPinBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "아이 ID와 PIN 4자리를 입력해주세요." });
@@ -94,6 +108,7 @@ router.post("/auth/child-login", async (req, res) => {
     return;
   }
 
+  await regenerateSession(req);
   req.session.childId = child.id;
   req.session.parentId = undefined;
   res.json({ id: child.id, name: child.name, age: child.age, avatar: child.avatar, balance: child.balance, parentId: child.parentId });
