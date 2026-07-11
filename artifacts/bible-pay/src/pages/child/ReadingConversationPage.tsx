@@ -185,11 +185,21 @@ export default function ReadingConversationPage() {
 
       {!result && attemptId && (
         <div className="fixed bottom-0 inset-x-0 bg-white border-t p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
-          {canComplete && <button onClick={complete} disabled={sending} className="w-full mb-3 py-2.5 rounded-xl bg-green-500 text-white text-sm font-bold disabled:opacity-50">질문을 마치고 포인트 받기</button>}
-          <form onSubmit={send} className="flex gap-2 max-w-2xl mx-auto">
-            <input value={input} onChange={(event) => setInput(event.target.value)} maxLength={800} placeholder="읽은 내용에서 궁금한 점을 물어보세요" className="flex-1 min-w-0 rounded-2xl border px-4 py-3 text-sm focus:outline-none focus:border-violet-400" />
-            <button type="submit" disabled={sending || input.trim().length < 2} className="w-12 rounded-2xl bg-violet-500 text-white flex items-center justify-center disabled:opacity-40" aria-label="질문 보내기"><Send className="w-5 h-5" /></button>
-          </form>
+          {canComplete ? (
+            <div className="max-w-2xl mx-auto space-y-2">
+              <button onClick={complete} disabled={sending} className="w-full py-3 rounded-xl bg-green-500 text-white text-sm font-bold disabled:opacity-50">
+                {sending ? "포인트를 계산하고 있어요..." : "질문을 마치고 포인트 받기"}
+              </button>
+              <button onClick={() => setCanComplete(false)} disabled={sending} className="w-full py-2.5 rounded-xl bg-gray-100 text-gray-700 text-sm font-bold disabled:opacity-50">
+                질문 더 하기
+              </button>
+            </div>
+          ) : (
+            <form onSubmit={send} className="flex gap-2 max-w-2xl mx-auto">
+              <input value={input} onChange={(event) => setInput(event.target.value)} maxLength={800} placeholder="읽은 내용에서 궁금한 점을 물어보세요" className="flex-1 min-w-0 rounded-2xl border px-4 py-3 text-sm focus:outline-none focus:border-violet-400" />
+              <button type="submit" disabled={sending || input.trim().length < 2} className="w-12 rounded-2xl bg-violet-500 text-white flex items-center justify-center disabled:opacity-40" aria-label="질문 보내기"><Send className="w-5 h-5" /></button>
+            </form>
+          )}
         </div>
       )}
     </div>
