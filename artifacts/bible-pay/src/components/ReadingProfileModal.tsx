@@ -9,7 +9,6 @@ export function ReadingProfileModal({ child, onClose, onSaved }: { child: ChildD
   const [readingLevel, setReadingLevel] = useState(child.readingLevel ?? "normal");
   const [aiAnswerLength, setAiAnswerLength] = useState(child.aiAnswerLength ?? "normal");
   const [explainDifficultWords, setExplainDifficultWords] = useState(child.explainDifficultWords ?? true);
-  const [dailyReadingRetryLimit, setDailyReadingRetryLimit] = useState(child.dailyReadingRetryLimit ?? 3);
   const [saving, setSaving] = useState(false);
   const { toast } = useToast();
 
@@ -21,7 +20,6 @@ export function ReadingProfileModal({ child, onClose, onSaved }: { child: ChildD
         readingLevel,
         aiAnswerLength,
         explainDifficultWords,
-        dailyReadingRetryLimit,
       });
       await onSaved();
       toast({ title: `${child.name}의 독서 AI 설정을 저장했어요.` });
@@ -40,7 +38,6 @@ export function ReadingProfileModal({ child, onClose, onSaved }: { child: ChildD
           <label className="block text-sm font-bold">읽기 수준<select value={readingLevel} onChange={(event) => setReadingLevel(event.target.value as typeof readingLevel)} className="mt-1.5 w-full border rounded-xl p-3 font-normal"><option value="easy">쉬운 설명</option><option value="normal">보통</option><option value="advanced">깊이 있는 설명</option></select></label>
           <label className="block text-sm font-bold">AI 답변 길이<select value={aiAnswerLength} onChange={(event) => setAiAnswerLength(event.target.value as typeof aiAnswerLength)} className="mt-1.5 w-full border rounded-xl p-3 font-normal"><option value="short">짧게</option><option value="normal">보통</option><option value="long">길게</option></select></label>
           <label className="flex items-center justify-between rounded-xl bg-gray-50 p-3 text-sm font-bold">어려운 단어도 설명하기<input type="checkbox" checked={explainDifficultWords} onChange={(event) => setExplainDifficultWords(event.target.checked)} className="w-5 h-5" /></label>
-          <label className="block text-sm font-bold">하루 재도전 횟수<select value={dailyReadingRetryLimit} onChange={(event) => setDailyReadingRetryLimit(Number(event.target.value))} className="mt-1.5 w-full border rounded-xl p-3 font-normal">{[1, 2, 3, 4, 5].map((value) => <option key={value} value={value}>{value}회</option>)}</select></label>
         </div>
         <button onClick={save} disabled={saving} className="mt-6 w-full h-12 rounded-xl bg-gray-900 text-white font-bold flex items-center justify-center gap-2 disabled:opacity-50">{saving && <Loader2 className="w-4 h-4 animate-spin" />}저장하기</button>
       </div>

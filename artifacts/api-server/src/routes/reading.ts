@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { and, count, desc, eq, gte, sql } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { z } from "zod/v4";
 import {
   childrenTable, db, missionAssignmentsTable, missionsTable,
@@ -69,11 +69,6 @@ router.post("/reading/attempts", requireChild, async (req, res) => {
   const [completed] = await db.select({ id: readingAttemptsTable.id }).from(readingAttemptsTable)
     .where(and(eq(readingAttemptsTable.missionId, mission.id), eq(readingAttemptsTable.childId, childId), eq(readingAttemptsTable.readingUnitKey, parsed.data.readingUnitKey), eq(readingAttemptsTable.status, "completed"))).limit(1);
   if (completed) { res.status(409).json({ error: "이미 완료한 읽기 범위예요." }); return; }
-  const [{ attemptsToday }] = await db.select({ attemptsToday: count() }).from(readingAttemptsTable)
-    .where(and(eq(readingAttemptsTable.missionId, mission.id), eq(readingAttemptsTable.childId, childId), gte(readingAttemptsTable.startedAt, sql`date_trunc('day', now() AT TIME ZONE 'Asia/Seoul') AT TIME ZONE 'Asia/Seoul'`)));
-  const limit = Math.min(child.dailyReadingRetryLimit, mission.maxReadingAttemptsPerDay);
-  if (Number(attemptsToday) >= limit) { res.status(429).json({ error: `오늘은 ${limit}번까지 도전할 수 있어요.` }); return; }
-
   const [attempt] = await db.insert(readingAttemptsTable).values({
     childId,
     missionId: mission.id,
