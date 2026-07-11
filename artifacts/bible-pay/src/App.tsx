@@ -22,6 +22,7 @@ import LedgerPage from "@/pages/child/LedgerPage";
 import SettingsPage from "@/pages/child/SettingsPage";
 import BibleChapterPage from "@/pages/child/BibleChapterPage";
 import QuizPage from "@/pages/child/QuizPage";
+import ReadingConversationPage from "@/pages/child/ReadingConversationPage";
 import ShopPage from "@/pages/child/ShopPage";
 import AdminPage from "@/pages/AdminPage";
 
@@ -49,6 +50,7 @@ function Router() {
       <Route path="/child/settings" component={SettingsPage} />
       <Route path="/child/bible/:missionId" component={BibleChapterPage} />
       <Route path="/child/quiz/:missionId" component={QuizPage} />
+      <Route path="/child/reading/:missionId" component={ReadingConversationPage} />
 
       <Route path="/admin" component={AdminPage} />
 

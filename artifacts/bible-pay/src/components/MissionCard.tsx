@@ -149,7 +149,7 @@ export function MissionCard({ mission, childId }: MissionCardProps) {
 
       {mission.type === "bible" && !done && (
         <p className="text-xs text-gray-500 mb-3 bg-blue-50 rounded-xl px-3 py-2">
-          📚 성경 책과 장을 선택하면 AI가 퀴즈 2문제를 내요. 전부 맞히면 용돈 지급!
+          📖 읽은 장을 고른 뒤 AI와 궁금한 점을 대화해요. 질문의 깊이에 따라 500~2,000P를 받아요.
         </p>
       )}
 
@@ -214,7 +214,7 @@ export function MissionCard({ mission, childId }: MissionCardProps) {
             data-testid={`mission-action-btn-${mission.id}`}
           >
             {loading && <Loader2 className="w-4 h-4 animate-spin" />}
-            {mission.type === "bible" ? "📖 성경책 선택하기" : "✅ 완료했어요!"}
+              {mission.type === "bible" ? "📖 읽은 성경 장 선택하기" : "✅ 완료했어요!"}
           </button>
         )
       )}
