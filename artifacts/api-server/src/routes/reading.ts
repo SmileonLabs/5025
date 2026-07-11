@@ -114,6 +114,7 @@ router.post("/reading/attempts/:id/messages", requireChild, async (req, res) => 
 });
 
 router.post("/reading/attempts/:id/complete", requireChild, async (req, res) => {
+  if (!readingFeatureFlags.rewardAutoApproveEnabled) { res.status(503).json({ error: "AI 포인트 자동 지급이 아직 준비 중이에요." }); return; }
   const id = Number(req.params.id); const row = await ownedAttempt(id, req.session.childId!);
   if (!Number.isInteger(id) || !row || row.attempt.status !== "in_progress") { res.status(404).json({ error: "진행 중인 독서 대화를 찾을 수 없어요." }); return; }
   if (row.attempt.childMessageCount < row.mission.minConversationTurns) { res.status(409).json({ error: `질문을 ${row.mission.minConversationTurns}번 이상 나눠야 해요.` }); return; }
