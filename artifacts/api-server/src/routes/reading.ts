@@ -3,7 +3,7 @@ import { and, count, eq, gte, sql } from "drizzle-orm";
 import { z } from "zod/v4";
 import {
   childrenTable, db, missionAssignmentsTable, missionsTable,
-  readingAttemptsTable, readingMessagesTable,
+  readingAttemptsTable, readingMessagesTable, booksTable, bookReadingUnitsTable,
 } from "@workspace/db";
 import { readingFeatureFlags } from "../lib/featureFlags";
 import { createReadingReply, evaluateReadingConversation, moderateReadingMessage, pointsForEvaluation } from "../lib/readingConversation";
@@ -44,6 +44,19 @@ router.post("/reading/attempts", requireChild, async (req, res) => {
     res.status(404).json({ error: "독서 미션을 찾을 수 없어요." }); return;
   }
   if (mission.type === "book" && !readingFeatureFlags.bookMissionsEnabled) { res.status(404).json({ error: "일반도서 미션은 아직 준비 중이에요." }); return; }
+  let readingUnitKey = parsed.data.readingUnitKey;
+  let sourceLabel = parsed.data.sourceLabel;
+  let readingSummary = parsed.data.readingSummary;
+  if (mission.type === "book") {
+    const match = /^book:(\d+):(\d+)$/.exec(readingUnitKey);
+    if (!match || mission.bookId !== Number(match[1])) { res.status(400).json({ error: "책의 읽은 범위를 확인해 주세요." }); return; }
+    const [unit] = await db.select({ unit: bookReadingUnitsTable, book: booksTable }).from(bookReadingUnitsTable)
+      .innerJoin(booksTable, eq(bookReadingUnitsTable.bookId, booksTable.id))
+      .where(and(eq(bookReadingUnitsTable.id, Number(match[2])), eq(booksTable.id, mission.bookId), eq(booksTable.parentId, child.parentId), eq(booksTable.verifiedByParent, true))).limit(1);
+    if (!unit) { res.status(400).json({ error: "확인된 목차를 선택해 주세요." }); return; }
+    sourceLabel = `${unit.book.title} - ${unit.unit.title}`;
+    readingSummary = unit.book.description ?? undefined;
+  }
   if (!mission.assignToAll) {
     const [assigned] = await db.select().from(missionAssignmentsTable)
       .where(and(eq(missionAssignmentsTable.missionId, mission.id), eq(missionAssignmentsTable.childId, childId))).limit(1);
@@ -60,11 +73,11 @@ router.post("/reading/attempts", requireChild, async (req, res) => {
   const [attempt] = await db.insert(readingAttemptsTable).values({
     childId,
     missionId: mission.id,
-    readingUnitKey: parsed.data.readingUnitKey,
-    sourceLabel: parsed.data.sourceLabel,
-    readingSummary: parsed.data.readingSummary,
+    readingUnitKey,
+    sourceLabel,
+    readingSummary,
   }).returning();
-  const opening = `오늘 읽은 ${parsed.data.sourceLabel}에서 가장 궁금했던 일이나 “왜 그랬을까?”라고 생각한 것을 이야기해 줄래?`;
+  const opening = `오늘 읽은 ${sourceLabel}에서 가장 궁금했던 일이나 “왜 그랬을까?”라고 생각한 것을 이야기해 줄래?`;
   await db.insert(readingMessagesTable).values({ attemptId: attempt.id, role: "assistant", content: opening });
   res.status(201).json({ attempt, message: { role: "assistant", content: opening } });
 });

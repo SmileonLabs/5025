@@ -24,6 +24,7 @@ CREATE TABLE IF NOT EXISTS "books" (
   "created_at" timestamptz NOT NULL DEFAULT now()
 );
 CREATE UNIQUE INDEX IF NOT EXISTS "uq_books_parent_isbn" ON "books"("parent_id", "isbn");
+ALTER TABLE "missions" ADD COLUMN IF NOT EXISTS "book_id" integer REFERENCES "books"("id") ON DELETE SET NULL;
 
 CREATE TABLE IF NOT EXISTS "book_reading_units" (
   "id" serial PRIMARY KEY,

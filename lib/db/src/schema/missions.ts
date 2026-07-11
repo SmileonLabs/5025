@@ -1,5 +1,6 @@
 import { pgTable, serial, text, integer, boolean, timestamp, date } from "drizzle-orm/pg-core";
 import { parentsTable } from "./parents";
+import { booksTable } from "./books";
 
 export const missionsTable = pgTable("missions", {
   id: serial("id").primaryKey(),
@@ -14,6 +15,7 @@ export const missionsTable = pgTable("missions", {
   minConversationTurns: integer("min_conversation_turns").notNull().default(2),
   maxReadingAttemptsPerDay: integer("max_reading_attempts_per_day").notNull().default(3),
   readingAutoApprove: boolean("reading_auto_approve").notNull().default(true),
+  bookId: integer("book_id").references(() => booksTable.id, { onDelete: "set null" }),
   // activity 전용 설정 (bible 미션은 무시)
   scheduleType: text("schedule_type").notNull().$type<"daily" | "once">().default("daily"),
   scheduledDate: date("scheduled_date"), // scheduleType === "once" 일 때 지정일 (YYYY-MM-DD)

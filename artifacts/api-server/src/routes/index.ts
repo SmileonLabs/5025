@@ -12,6 +12,7 @@ import gifticonsRouter from "./gifticons";
 import adminRouter from "./admin";
 import storageRouter from "./storage";
 import readingRouter from "./reading";
+import booksRouter from "./books";
 
 const router: IRouter = Router();
 
@@ -28,5 +29,6 @@ router.use(gifticonsRouter);
 router.use(adminRouter);
 router.use(storageRouter);
 router.use(readingRouter);
+router.use(booksRouter);
 
 export default router;
