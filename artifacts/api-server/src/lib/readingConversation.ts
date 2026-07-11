@@ -37,11 +37,13 @@ function profileInstruction(profile: ReadingProfile): string {
 async function jsonCompletion<T>(prompt: string, schema: z.ZodType<T>): Promise<T> {
   const completion = await openai.chat.completions.create({
     model: process.env.READING_AI_MODEL ?? "gpt-5-mini",
-    max_completion_tokens: 1200,
-    response_format: { type: "json_object" },
-    messages: [{ role: "system", content: prompt }],
+    max_completion_tokens: 4096,
+    messages: [{ role: "user", content: prompt }],
   });
-  return schema.parse(JSON.parse(completion.choices[0]?.message?.content ?? "{}"));
+  const content = completion.choices[0]?.message?.content ?? "";
+  const json = content.match(/\{[\s\S]*\}/)?.[0];
+  if (!json) throw new Error("Reading AI returned no valid JSON.");
+  return schema.parse(JSON.parse(json));
 }
 
 export async function moderateReadingMessage(input: string): Promise<boolean> {
