@@ -1,4 +1,4 @@
-import { pgTable, serial, text, integer, boolean, timestamp, date } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, integer, boolean, timestamp, date, jsonb } from "drizzle-orm/pg-core";
 import { parentsTable } from "./parents";
 import { booksTable } from "./books";
 
@@ -17,8 +17,9 @@ export const missionsTable = pgTable("missions", {
   readingAutoApprove: boolean("reading_auto_approve").notNull().default(true),
   bookId: integer("book_id").references(() => booksTable.id, { onDelete: "set null" }),
   // activity 전용 설정 (bible 미션은 무시)
-  scheduleType: text("schedule_type").notNull().$type<"daily" | "once">().default("daily"),
+  scheduleType: text("schedule_type").notNull().$type<"daily" | "weekly" | "once">().default("daily"),
   scheduledDate: date("scheduled_date"), // scheduleType === "once" 일 때 지정일 (YYYY-MM-DD)
+  weeklyDays: jsonb("weekly_days").notNull().$type<number[]>().default([]), // 0=일요일 ... 6=토요일
   timeLimit: text("time_limit"), // "HH:MM" 마감 시각(KST). null이면 제한 없음
   requiresPhoto: boolean("requires_photo").notNull().default(false), // 인증샷 필요 여부
   // activity 전용: 한 아이가 이 미션을 수행할 수 있는 최대 횟수(승인+대기 누적, 반려 제외). null이면 무제한.

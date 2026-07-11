@@ -321,8 +321,9 @@ const MissionFields = z.object({
   description: z.string().max(500).default(""),
   type: z.enum(["bible", "activity"]),
   reward: z.number().int().min(0).max(100000),
-  scheduleType: z.enum(["daily", "once"]).default("daily"),
+  scheduleType: z.enum(["daily", "weekly", "once"]).default("daily"),
   scheduledDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
+  weeklyDays: z.array(z.number().int().min(0).max(6)).max(7).default([]),
   timeLimit: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).nullable().optional(),
   requiresPhoto: z.boolean().default(false),
   assignToAll: z.boolean().default(true),
@@ -333,6 +334,9 @@ const MissionFields = z.object({
 const CreateMissionBody = MissionFields.refine((v) => v.scheduleType !== "once" || !!v.scheduledDate, {
   message: "지정일을 선택해주세요.",
   path: ["scheduledDate"],
+}).refine((v) => v.scheduleType !== "weekly" || v.weeklyDays.length > 0, {
+  message: "수행할 요일을 하나 이상 선택해주세요.",
+  path: ["weeklyDays"],
 }).refine((v) => v.assignToAll || (v.childIds != null && v.childIds.length > 0), {
   message: "대상 아이를 선택해주세요.",
   path: ["childIds"],
@@ -341,6 +345,9 @@ const CreateMissionBody = MissionFields.refine((v) => v.scheduleType !== "once" 
 const UpdateMissionBody = MissionFields.partial().refine((v) => v.scheduleType !== "once" || v.scheduledDate != null, {
   message: "지정일을 선택해주세요.",
   path: ["scheduledDate"],
+}).refine((v) => v.scheduleType !== "weekly" || (v.weeklyDays != null && v.weeklyDays.length > 0), {
+  message: "수행할 요일을 하나 이상 선택해주세요.",
+  path: ["weeklyDays"],
 }).refine((v) => v.assignToAll !== false || (v.childIds != null && v.childIds.length > 0), {
   message: "대상 아이를 선택해주세요.",
   path: ["childIds"],
@@ -413,6 +420,8 @@ app.post("/api/missions", async (c) => {
   const parsed = CreateMissionBody.safeParse(await readJson(c));
   if (!parsed.success) return jsonError(c, 400, parsed.error.issues[0]?.message ?? "입력값을 확인해주세요.");
   const { childIds, assignToAll, ...missionData } = parsed.data;
+  if (missionData.scheduleType !== "once") missionData.scheduledDate = null;
+  if (missionData.scheduleType !== "weekly") missionData.weeklyDays = [];
 
   let validChildIds: number[] = [];
   if (!assignToAll) {
@@ -442,6 +451,9 @@ app.patch("/api/missions/:id", async (c) => {
   const parsed = UpdateMissionBody.safeParse(await readJson(c));
   if (!parsed.success) return jsonError(c, 400, parsed.error.issues[0]?.message ?? "입력값을 확인해주세요.");
   const { childIds, assignToAll, ...missionData } = parsed.data;
+  const effectiveSchedule = missionData.scheduleType ?? existing.scheduleType;
+  if (missionData.scheduleType !== undefined && effectiveSchedule !== "once") missionData.scheduledDate = null;
+  if (missionData.scheduleType !== undefined && effectiveSchedule !== "weekly") missionData.weeklyDays = [];
 
   let validChildIds: number[] = [];
   if (assignToAll === false) {
@@ -521,14 +533,18 @@ app.post("/api/missions/:id/submit", async (c) => {
       if (nowKstHHMM > mission.timeLimit) return jsonError(c, 409, `마감 시간(${mission.timeLimit})이 지났어요.`);
     }
 
+    const todayKst = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Asia/Seoul",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(new Date());
     if (mission.scheduleType === "once" && mission.scheduledDate) {
-      const todayKst = new Intl.DateTimeFormat("en-CA", {
-        timeZone: "Asia/Seoul",
-        year: "numeric",
-        month: "2-digit",
-        day: "2-digit",
-      }).format(new Date());
       if (mission.scheduledDate !== todayKst) return jsonError(c, 409, `이 미션은 ${mission.scheduledDate}에 할 수 있어요.`);
+    }
+    if (mission.scheduleType === "weekly") {
+      const weekday = new Date(`${todayKst}T00:00:00Z`).getUTCDay();
+      if (!mission.weeklyDays.includes(weekday)) return jsonError(c, 409, "오늘은 이 미션을 하는 요일이 아니에요.");
     }
 
     const dupConds = [
@@ -536,12 +552,12 @@ app.post("/api/missions/:id/submit", async (c) => {
       eq(missionLogsTable.childId, childId),
       inArray(missionLogsTable.status, ["requested", "approved"]),
     ];
-    if (mission.scheduleType === "daily") {
+    if (mission.scheduleType !== "once") {
       dupConds.push(sql`(${missionLogsTable.createdAt} AT TIME ZONE 'Asia/Seoul')::date = (now() AT TIME ZONE 'Asia/Seoul')::date`);
     }
     const dup = await db.select({ id: missionLogsTable.id }).from(missionLogsTable).where(and(...dupConds)).limit(1);
     if (dup.length > 0) {
-      return jsonError(c, 409, mission.scheduleType === "daily" ? "오늘은 이미 완료 요청했어요." : "이미 완료 요청한 미션이에요.");
+      return jsonError(c, 409, mission.scheduleType !== "once" ? "오늘은 이미 완료 요청했어요." : "이미 완료 요청한 미션이에요.");
     }
 
     const [log] = await db.insert(missionLogsTable).values({ missionId, childId, status: "requested", photoUrl: photoUrl ?? null }).returning();

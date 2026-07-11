@@ -101,6 +101,9 @@ ${transcript}
 
 나이에 맞춰 공정하게 평가한다. 읽은 내용과 관련된 아이 질문이 없거나 무의미한 반복뿐이면 relevant=false이며 모든 점수는 0이다.
 각 점수는 0~2 정수다: 관련성, 구체성, 이유를 생각함, 자기표현, 후속질문.
+reason은 아이에게 직접 말하는 다정한 한국어로 2문장 이내로 쓴다.
+첫 문장에는 아이가 잘한 점을 구체적으로 칭찬하고, 다음 문장에는 받은 포인트의 이유나 다음에 더 좋은 질문을 만드는 쉬운 방법을 설명한다.
+"관련성 점수", "추론", "평가 기준" 같은 딱딱한 채점 용어는 쓰지 않는다. relevant=false일 때도 혼내지 말고 읽은 내용에서 다시 궁금한 점을 찾아보도록 격려한다.
 JSON만 반환: {"relevant":boolean,"relevanceScore":number,"specificityScore":number,"reasoningScore":number,"selfExpressionScore":number,"followUpScore":number,"reason":string}`,
     ReadingEvaluationSchema,
   );

@@ -120,7 +120,7 @@ export default function ReadingConversationPage() {
       const response = await api.post<MessageResponse>(`/reading/attempts/${attemptId}/messages`, { content });
       setMessages((current) => [...current, { role: "assistant", content: response.message }]);
       if (response.status === "failed") {
-        setResult({ status: "failed", rewardPoints: 0, canRetry: true, evaluation: { reason: "읽은 내용과 관련된 질문이 없어 이번 미션은 완료되지 않았어요." } });
+        setResult({ status: "failed", rewardPoints: 0, canRetry: true, evaluation: { reason: "이번 질문은 읽은 내용과 조금 멀리 있었어요. 책에서 가장 궁금했던 장면을 하나 떠올려 다시 물어보면 훨씬 좋은 질문이 될 거예요!" } });
       } else {
         const previousChildMessages = messages.filter((item) => item.role === "child").length;
         if (response.shouldEnd || previousChildMessages >= 1) setCanComplete(true);
@@ -155,7 +155,10 @@ export default function ReadingConversationPage() {
       </header>
 
       <main className="flex-1 px-4 py-5 space-y-3 overflow-y-auto pb-40">
-        <div className="bg-amber-50 text-amber-800 rounded-2xl px-4 py-3 text-xs leading-relaxed">읽은 내용에서 궁금한 점을 질문해 보세요. 관련 없는 질문만 하면 0P이며 읽기 완료로 표시되지 않아요.</div>
+        <div className="bg-amber-50 text-amber-900 rounded-2xl px-4 py-3 text-sm leading-relaxed border border-amber-100">
+          <p className="font-black">💡 읽은 내용을 깊이 생각한 좋은 질문일수록 더 큰 포인트를 받아요!</p>
+          <p className="mt-1 text-xs text-amber-800">왜 그런지, 나라면 어떻게 할지, 다음에는 무슨 일이 생길지 물어보세요. 관련 없는 질문만 하면 0P이며 읽기 완료로 표시되지 않아요.</p>
+        </div>
         {loading && <div className="flex justify-center py-16"><Loader2 className="animate-spin text-violet-500" /></div>}
         {startError && (
           <section className="bg-white border border-rose-200 rounded-3xl p-6 text-center">
@@ -176,7 +179,10 @@ export default function ReadingConversationPage() {
           <section className={`rounded-3xl p-5 text-center border ${result.status === "completed" ? "bg-green-50 border-green-200" : "bg-rose-50 border-rose-200"}`}>
             <p className="text-3xl mb-2">{result.status === "completed" ? "🎉" : "🌱"}</p>
             <h2 className="font-black text-lg">{result.status === "completed" ? `+${result.rewardPoints.toLocaleString("ko-KR")}P 받았어요!` : "아직 미션 완료가 아니에요"}</h2>
-            <p className="text-sm text-gray-600 mt-2">{result.evaluation.reason}</p>
+            <div className="mt-3 rounded-2xl bg-white/70 p-3 text-left">
+              <p className="text-xs font-black text-gray-500 mb-1">AI 선생님의 이야기</p>
+              <p className="text-sm text-gray-700 leading-relaxed">{result.evaluation.reason}</p>
+            </div>
             <button onClick={() => setLocation(result.status === "completed" ? "/child/missions" : backPath)} className="mt-4 w-full rounded-xl bg-gray-900 text-white py-3 font-bold">{result.status === "completed" ? "미션으로 돌아가기" : "다시 읽고 도전하기"}</button>
           </section>
         )}

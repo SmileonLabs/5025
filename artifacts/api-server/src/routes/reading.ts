@@ -47,6 +47,18 @@ router.post("/reading/attempts", requireChild, async (req, res) => {
   if (!child || !mission || !mission.isActive || mission.parentId !== child.parentId || !["bible", "book"].includes(mission.type)) {
     res.status(404).json({ error: "독서 미션을 찾을 수 없어요." }); return;
   }
+  const todayKst = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Seoul", year: "numeric", month: "2-digit", day: "2-digit",
+  }).format(new Date());
+  if (mission.scheduleType === "once" && mission.scheduledDate !== todayKst) {
+    res.status(409).json({ error: `이 미션은 ${mission.scheduledDate}에 할 수 있어요.` }); return;
+  }
+  if (mission.scheduleType === "weekly") {
+    const weekday = new Date(`${todayKst}T00:00:00Z`).getUTCDay();
+    if (!mission.weeklyDays.includes(weekday)) {
+      res.status(409).json({ error: "오늘은 이 미션을 하는 요일이 아니에요." }); return;
+    }
+  }
   if (mission.type === "book" && !readingFeatureFlags.bookMissionsEnabled) { res.status(404).json({ error: "일반도서 미션은 아직 준비 중이에요." }); return; }
   let readingUnitKey = parsed.data.readingUnitKey;
   let sourceLabel = parsed.data.sourceLabel;
@@ -101,7 +113,7 @@ router.post("/reading/attempts/:id/messages", requireChild, async (req, res) => 
     await tx.update(readingAttemptsTable).set({ childMessageCount: row.attempt.childMessageCount + 1, offTopicCount }).where(eq(readingAttemptsTable.id, id));
   });
   if (!decision.relevant && offTopicCount >= 2) {
-    const evaluation = { relevant: false, relevanceScore: 0, specificityScore: 0, reasoningScore: 0, selfExpressionScore: 0, followUpScore: 0, reason: "읽은 내용과 관련된 질문이 없어 미션이 완료되지 않았습니다." };
+    const evaluation = { relevant: false, relevanceScore: 0, specificityScore: 0, reasoningScore: 0, selfExpressionScore: 0, followUpScore: 0, reason: "이번 질문은 읽은 내용과 조금 멀리 있었어요. 책에서 가장 궁금했던 장면을 떠올려 다시 물어보면 더 좋은 질문이 될 거예요!" };
     await failReadingAttempt(id, evaluation, evaluation.reason);
     res.json({ message: decision.reply, status: "failed", rewardPoints: 0, canRetry: true }); return;
   }

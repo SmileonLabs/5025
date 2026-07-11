@@ -68,7 +68,7 @@ type TopupPrepareResponse = TossTopupRequest & {
 };
 
 export type MissionType = "bible" | "activity" | "book";
-export type MissionScheduleType = "daily" | "once";
+export type MissionScheduleType = "daily" | "weekly" | "once";
 
 export interface Mission {
   id: number;
@@ -83,6 +83,7 @@ export interface Mission {
   // activity 전용 메타 (bible은 무시)
   scheduleType: MissionScheduleType;
   scheduledDate: string | null;
+  weeklyDays: number[];
   timeLimit: string | null;
   requiresPhoto: boolean;
   // activity 전용: 아이별 최대 수행 횟수(승인+대기 누적). null이면 무제한.
@@ -102,6 +103,7 @@ export interface MissionInput {
   reward: number;
   scheduleType: MissionScheduleType;
   scheduledDate?: string | null;
+  weeklyDays?: number[];
   timeLimit?: string | null;
   requiresPhoto: boolean;
   // activity 전용: 아이별 최대 수행 횟수. null/생략 시 무제한.
@@ -218,7 +220,7 @@ interface AppState {
   refreshChildren: () => Promise<void>;
   // Mission management (parent)
   createMission: (data: MissionInput) => Promise<void>;
-  updateMission: (id: number, data: Partial<Pick<Mission, "title" | "description" | "reward" | "isActive" | "scheduleType" | "scheduledDate" | "timeLimit" | "requiresPhoto" | "maxCompletions" | "assignToAll">> & { childIds?: number[] }) => Promise<void>;
+  updateMission: (id: number, data: Partial<Pick<Mission, "title" | "description" | "type" | "reward" | "isActive" | "scheduleType" | "scheduledDate" | "weeklyDays" | "timeLimit" | "requiresPhoto" | "maxCompletions" | "assignToAll">> & { childIds?: number[] }) => Promise<void>;
   deleteMission: (id: number) => Promise<void>;
   refreshMissions: () => Promise<void>;
   // Mission actions (child)
@@ -375,6 +377,47 @@ export function AppProvider({ children: reactChildren }: { children: ReactNode }
     })();
   }, []);
 
+  // Keep dashboards and mission lists fresh without requiring a manual reload.
+  // Refresh on a short interval and immediately whenever the app regains focus.
+  useEffect(() => {
+    if (loading || !role) return;
+    let refreshing = false;
+    const refreshLiveData = async () => {
+      if (refreshing) return;
+      refreshing = true;
+      try {
+        if (role === "parent") {
+          const me = await api.get<{ role: "parent" } & ParentData>("/auth/me").catch(() => null);
+          if (me) setParent({ id: me.id, name: me.name, email: me.email, balance: me.balance });
+          await Promise.all([
+            refreshChildren(), refreshMissions(), refreshPendingLogs(), refreshParentTransactions(),
+            refreshRequests(), refreshGifticonOrders(), refreshMissionLogs(),
+          ]);
+        } else {
+          const [me, txs] = await Promise.all([
+            api.get<{ role: "child" } & ChildData>("/auth/me").catch(() => null),
+            api.get<Transaction[]>("/transactions").catch(() => null),
+          ]);
+          if (me) setCurrentChild(me);
+          if (txs) setTransactions(txs);
+          await Promise.all([refreshMissions(), refreshGifticonCatalog(), refreshGifticonOrders(), refreshMissionLogs()]);
+        }
+      } finally {
+        refreshing = false;
+      }
+    };
+    const onVisible = () => { if (document.visibilityState === "visible") void refreshLiveData(); };
+    const onFocus = () => { void refreshLiveData(); };
+    const interval = window.setInterval(() => void refreshLiveData(), 15_000);
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [loading, role, refreshChildren, refreshGifticonCatalog, refreshGifticonOrders, refreshMissionLogs, refreshMissions, refreshParentTransactions, refreshPendingLogs, refreshRequests]);
+
   const login = async (email: string, password: string) => {
     const data = await api.post<ParentData>("/auth/login", { email, password });
     setParent(data);
@@ -462,7 +505,7 @@ export function AppProvider({ children: reactChildren }: { children: ReactNode }
     setMissions(prev => [mission, ...prev]);
   };
 
-  const updateMission = async (id: number, data: Partial<Pick<Mission, "title" | "description" | "reward" | "isActive" | "scheduleType" | "scheduledDate" | "timeLimit" | "requiresPhoto" | "maxCompletions" | "assignToAll">> & { childIds?: number[] }) => {
+  const updateMission = async (id: number, data: Partial<Pick<Mission, "title" | "description" | "type" | "reward" | "isActive" | "scheduleType" | "scheduledDate" | "weeklyDays" | "timeLimit" | "requiresPhoto" | "maxCompletions" | "assignToAll">> & { childIds?: number[] }) => {
     const updated = await api.patch<Mission>(`/missions/${id}`, data);
     setMissions(prev => prev.map(m => m.id === id ? updated : m));
   };

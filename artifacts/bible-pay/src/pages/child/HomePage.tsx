@@ -44,7 +44,9 @@ export default function HomePage() {
 
   if (!currentChild) return null;
 
-  const featuredMission = missions.find(m => m.isActive) ?? missions[0];
+  const activeMissions = [...missions]
+    .filter(mission => mission.isActive)
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
   const totalEarned = transactions.filter(t => t.amount > 0).reduce((s, t) => s + t.amount, 0);
   const completedMissionsCount = transactions.filter(t => t.type === "mission").length;
@@ -127,11 +129,14 @@ export default function HomePage() {
           </button>
         </div>
 
-        {/* Today's Mission */}
-        {featuredMission && (
+        {/* Ongoing missions */}
+        {activeMissions.length > 0 && (
           <section>
             <div className="flex justify-between items-center mb-3">
-              <h2 className="text-lg font-bold text-gray-900">오늘의 미션</h2>
+              <div>
+                <h2 className="text-lg font-bold text-gray-900">진행 중인 미션</h2>
+                <p className="text-xs text-gray-400">새로 등록된 미션부터 보여요</p>
+              </div>
               <button
                 onClick={() => setLocation("/child/missions")}
                 className="text-primary-foreground text-sm font-bold"
@@ -140,11 +145,15 @@ export default function HomePage() {
                 전체보기
               </button>
             </div>
-            <MissionCard mission={featuredMission} childId={currentChild.id} />
+            <div className="space-y-3">
+              {activeMissions.map(mission => (
+                <MissionCard key={mission.id} mission={mission} childId={currentChild.id} />
+              ))}
+            </div>
           </section>
         )}
 
-        {missions.length === 0 && (
+        {activeMissions.length === 0 && (
           <div className="bg-white rounded-[24px] p-6 shadow-sm border border-gray-100 text-center">
             <div className="text-4xl mb-2">📋</div>
             <p className="font-bold text-gray-700">아직 미션이 없어요</p>

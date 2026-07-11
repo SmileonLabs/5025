@@ -31,12 +31,13 @@ const MissionFields = z.object({
   bookId: z.number().int().positive().nullable().optional(),
   reward: z.number().int().min(0).max(100000),
   // activity 전용 (bible은 무시)
-  scheduleType: z.enum(["daily", "once"]).default("daily"),
+  scheduleType: z.enum(["daily", "weekly", "once"]).default("daily"),
   scheduledDate: z
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/, "지정일 형식이 올바르지 않아요.")
     .nullable()
     .optional(),
+  weeklyDays: z.array(z.number().int().min(0).max(6)).max(7).default([]),
   timeLimit: z
     .string()
     .regex(/^([01]\d|2[0-3]):[0-5]\d$/, "시간 형식이 올바르지 않아요.")
@@ -57,6 +58,9 @@ const CreateMissionBody = MissionFields.refine(
   (v) => v.scheduleType !== "once" || !!v.scheduledDate,
   { message: "지정일을 선택해주세요.", path: ["scheduledDate"] },
 ).refine(
+  (v) => v.scheduleType !== "weekly" || v.weeklyDays.length > 0,
+  { message: "수행할 요일을 하나 이상 선택해주세요.", path: ["weeklyDays"] },
+).refine(
   (v) => v.assignToAll || (v.childIds != null && v.childIds.length > 0),
   { message: "대상 아이를 선택해주세요.", path: ["childIds"] },
 ).refine(
@@ -66,6 +70,9 @@ const CreateMissionBody = MissionFields.refine(
 const UpdateMissionBody = MissionFields.partial().refine(
   (v) => v.scheduleType !== "once" || v.scheduledDate != null,
   { message: "지정일을 선택해주세요.", path: ["scheduledDate"] },
+).refine(
+  (v) => v.scheduleType !== "weekly" || (v.weeklyDays != null && v.weeklyDays.length > 0),
+  { message: "수행할 요일을 하나 이상 선택해주세요.", path: ["weeklyDays"] },
 ).refine(
   (v) => v.assignToAll !== false || (v.childIds != null && v.childIds.length > 0),
   { message: "대상 아이를 선택해주세요.", path: ["childIds"] },
@@ -161,6 +168,8 @@ router.post("/missions", requireParent, async (req, res) => {
   if (missionData.type !== "activity" || missionData.scheduleType !== "daily") {
     missionData.maxCompletions = null;
   }
+  if (missionData.scheduleType !== "once") missionData.scheduledDate = null;
+  if (missionData.scheduleType !== "weekly") missionData.weeklyDays = [];
 
   // 특정 아이 지정 시 소유 검증 (cross-parent IDOR 방지)
   let validChildIds: number[] = [];
@@ -199,6 +208,8 @@ router.patch("/missions/:id", requireParent, async (req, res) => {
   if (effType !== "activity" || effSchedule !== "daily") {
     missionData.maxCompletions = null;
   }
+  if (missionData.scheduleType !== undefined && effSchedule !== "once") missionData.scheduledDate = null;
+  if (missionData.scheduleType !== undefined && effSchedule !== "weekly") missionData.weeklyDays = [];
 
   // 대상을 특정 아이로 바꾸는 경우 소유 검증
   let validChildIds: number[] = [];
@@ -296,16 +307,24 @@ router.post("/missions/:id/submit", requireChild, async (req, res) => {
       }
     }
 
+    const todayKst = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Asia/Seoul",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(new Date());
+
     // 지정일(once) enforce — 오늘(KST)이 지정일이 아니면 제출 거부
     if (mission.scheduleType === "once" && mission.scheduledDate) {
-      const todayKst = new Intl.DateTimeFormat("en-CA", {
-        timeZone: "Asia/Seoul",
-        year: "numeric",
-        month: "2-digit",
-        day: "2-digit",
-      }).format(new Date());
       if (mission.scheduledDate !== todayKst) {
         res.status(409).json({ error: `이 미션은 ${mission.scheduledDate}에 할 수 있어요.` });
+        return;
+      }
+    }
+    if (mission.scheduleType === "weekly") {
+      const weekday = new Date(`${todayKst}T00:00:00Z`).getUTCDay();
+      if (!mission.weeklyDays.includes(weekday)) {
+        res.status(409).json({ error: "오늘은 이 미션을 하는 요일이 아니에요." });
         return;
       }
     }
@@ -321,13 +340,13 @@ router.post("/missions/:id/submit", requireChild, async (req, res) => {
       await tx.execute(sql`SELECT pg_advisory_xact_lock(${missionId}::int, ${childId}::int)`);
 
       // 중복 방지: 미처리(requested/approved) 요청이 있으면 차단.
-      // daily는 오늘(KST) 분만, once는 기간 무관. rejected는 제외(재도전 가능).
+      // daily/weekly는 오늘(KST) 분만, once는 기간 무관. rejected는 제외(재도전 가능).
       const dupConds = [
         eq(missionLogsTable.missionId, missionId),
         eq(missionLogsTable.childId, childId),
         inArray(missionLogsTable.status, ["requested", "approved"]),
       ];
-      if (mission.scheduleType === "daily") {
+      if (mission.scheduleType !== "once") {
         dupConds.push(
           sql`(${missionLogsTable.createdAt} AT TIME ZONE 'Asia/Seoul')::date = (now() AT TIME ZONE 'Asia/Seoul')::date`,
         );
@@ -341,7 +360,7 @@ router.post("/missions/:id/submit", requireChild, async (req, res) => {
         return {
           ok: false,
           error:
-            mission.scheduleType === "daily"
+            mission.scheduleType !== "once"
               ? "오늘은 이미 완료 요청했어요."
               : "이미 완료 요청한 미션이에요.",
         };

@@ -18,6 +18,10 @@ const TYPE_INFO: Record<Mission["type"], { emoji: string; label: string; color: 
 
 function scheduleLabel(m: Mission): string {
   if (m.scheduleType === "once") return m.scheduledDate ? `${m.scheduledDate} 하루` : "지정일";
+  if (m.scheduleType === "weekly") {
+    const labels = ["일", "월", "화", "수", "목", "금", "토"];
+    return `매주 ${(m.weeklyDays ?? []).map(day => labels[day]).filter(Boolean).join("·")}`;
+  }
   return "매일";
 }
 
@@ -129,7 +133,7 @@ export function MissionCard({ mission, childId }: MissionCardProps) {
         </div>
       )}
 
-      {isActivity && (
+      {(
         <div className="flex flex-wrap gap-1.5 mb-3">
           <span className="inline-flex items-center gap-1 text-[11px] font-bold text-gray-500 bg-gray-50 rounded-full px-2.5 py-1">
             <CalendarDays className="w-3 h-3" /> {scheduleLabel(mission)}

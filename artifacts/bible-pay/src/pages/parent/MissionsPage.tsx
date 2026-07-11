@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
-import { ChevronLeft, Plus, Trash2, ToggleLeft, ToggleRight, CheckCircle, XCircle, Clock, Camera, CalendarDays, Users, RefreshCw } from "lucide-react";
+import { ChevronLeft, Plus, Trash2, ToggleLeft, ToggleRight, CheckCircle, XCircle, Clock, Camera, CalendarDays, Users, RefreshCw, Pencil } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAppContext, type Mission, type MissionScheduleType, type PendingLog, type ChildData, type MissionLog } from "@/context/AppContext";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,12 @@ const TYPE_LABELS: Record<Mission["type"], { label: string; emoji: string; desc:
   book:     { label: "일반도서", emoji: "📚", desc: "ISBN과 목차를 부모가 확인 → AI와 질문 대화 후 차등 지급", color: "bg-violet-50 text-violet-700 border-violet-200" },
 };
 
+const WEEKDAYS = [
+  { value: 0, label: "일" }, { value: 1, label: "월" }, { value: 2, label: "화" },
+  { value: 3, label: "수" }, { value: 4, label: "목" }, { value: 5, label: "금" },
+  { value: 6, label: "토" },
+];
+
 function todayKst(): string {
   return new Intl.DateTimeFormat("en-CA", {
     timeZone: "Asia/Seoul",
@@ -24,21 +30,22 @@ function todayKst(): string {
   }).format(new Date());
 }
 
-function MissionCreateModal({ onClose }: { onClose: () => void }) {
-  const { createMission, children } = useAppContext();
+function MissionCreateModal({ onClose, mission }: { onClose: () => void; mission?: Mission | null }) {
+  const { createMission, updateMission, children } = useAppContext();
   const { toast } = useToast();
-  const [type, setType] = useState<Mission["type"]>("bible");
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [reward, setReward] = useState("");
-  const [scheduleType, setScheduleType] = useState<MissionScheduleType>("daily");
-  const [scheduledDate, setScheduledDate] = useState("");
-  const [timeLimit, setTimeLimit] = useState("");
-  const [requiresPhoto, setRequiresPhoto] = useState(false);
-  const [maxLimited, setMaxLimited] = useState(false);
-  const [maxCount, setMaxCount] = useState("");
-  const [assignToAll, setAssignToAll] = useState(true);
-  const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  const [type, setType] = useState<Mission["type"]>(mission?.type ?? "bible");
+  const [title, setTitle] = useState(mission?.title ?? "");
+  const [description, setDescription] = useState(mission?.description ?? "");
+  const [reward, setReward] = useState(mission ? String(mission.reward) : "");
+  const [scheduleType, setScheduleType] = useState<MissionScheduleType>(mission?.scheduleType ?? "daily");
+  const [scheduledDate, setScheduledDate] = useState(mission?.scheduledDate ?? "");
+  const [weeklyDays, setWeeklyDays] = useState<number[]>(mission?.weeklyDays ?? []);
+  const [timeLimit, setTimeLimit] = useState(mission?.timeLimit ?? "");
+  const [requiresPhoto, setRequiresPhoto] = useState(mission?.requiresPhoto ?? false);
+  const [maxLimited, setMaxLimited] = useState(mission?.maxCompletions != null);
+  const [maxCount, setMaxCount] = useState(mission?.maxCompletions != null ? String(mission.maxCompletions) : "");
+  const [assignToAll, setAssignToAll] = useState(mission?.assignToAll ?? true);
+  const [selectedIds, setSelectedIds] = useState<number[]>(mission?.assignedChildIds ?? []);
   const [saving, setSaving] = useState(false);
 
   const selectAll = () => { setAssignToAll(true); setSelectedIds([]); };
@@ -53,8 +60,11 @@ function MissionCreateModal({ onClose }: { onClose: () => void }) {
     if (!title.trim()) { toast({ title: "미션 이름을 입력해주세요.", variant: "destructive" }); return; }
     const rewardNum = parseInt(reward, 10);
     if (!reward || isNaN(rewardNum) || rewardNum < 0) { toast({ title: "보상 금액을 입력해주세요.", variant: "destructive" }); return; }
-    if (type === "activity" && scheduleType === "once" && !scheduledDate) {
+    if (scheduleType === "once" && !scheduledDate) {
       toast({ title: "지정일을 선택해주세요.", variant: "destructive" }); return;
+    }
+    if (scheduleType === "weekly" && weeklyDays.length === 0) {
+      toast({ title: "수행할 요일을 하나 이상 선택해주세요.", variant: "destructive" }); return;
     }
     // 수행 횟수 제한은 매일 활동미션에만 적용 (once는 본래 1회, bible은 제외)
     let maxCompletions: number | null = null;
@@ -67,23 +77,26 @@ function MissionCreateModal({ onClose }: { onClose: () => void }) {
     }
     setSaving(true);
     try {
-      await createMission({
+      const payload = {
         title: title.trim(),
         description: description.trim(),
         type,
         reward: rewardNum,
-        scheduleType: type === "activity" ? scheduleType : "daily",
-        scheduledDate: type === "activity" && scheduleType === "once" ? scheduledDate : null,
+        scheduleType,
+        scheduledDate: scheduleType === "once" ? scheduledDate : null,
+        weeklyDays: scheduleType === "weekly" ? weeklyDays : [],
         timeLimit: type === "activity" && timeLimit ? timeLimit : null,
         requiresPhoto: type === "activity" ? requiresPhoto : false,
         maxCompletions,
         assignToAll: children.length === 0 ? true : assignToAll,
         childIds: children.length === 0 || assignToAll ? undefined : selectedIds,
-      });
-      toast({ title: "미션이 추가됐어요! 🎉" });
+      };
+      if (mission) await updateMission(mission.id, payload);
+      else await createMission(payload);
+      toast({ title: mission ? "미션 정보를 수정했어요." : "미션이 추가됐어요! 🎉" });
       onClose();
     } catch (err) {
-      toast({ title: err instanceof Error ? err.message : "미션 추가에 실패했어요.", variant: "destructive" });
+      toast({ title: err instanceof Error ? err.message : "미션 저장에 실패했어요.", variant: "destructive" });
     } finally {
       setSaving(false);
     }
@@ -99,17 +112,18 @@ function MissionCreateModal({ onClose }: { onClose: () => void }) {
         onClick={e => e.stopPropagation()}
       >
         <div className="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mb-2" />
-        <h2 className="text-xl font-black text-gray-900">새 미션 추가</h2>
+        <h2 className="text-xl font-black text-gray-900">{mission ? "미션 정보 수정" : "새 미션 추가"}</h2>
 
         <div>
           <p className="text-sm font-bold text-gray-600 mb-2">미션 종류</p>
           <div className="grid grid-cols-2 gap-2">
-            {(["bible", "activity"] as Mission["type"][]).map(t => {
+            {((mission?.type === "book" ? ["book"] : ["bible", "activity"]) as Mission["type"][]).map(t => {
               const tinfo = TYPE_LABELS[t];
               return (
                 <button
                   key={t}
-                  onClick={() => setType(t)}
+                  onClick={() => !mission && setType(t)}
+                  disabled={!!mission}
                   className={`p-3 rounded-[16px] border-2 flex flex-col items-center gap-1.5 transition-all ${
                     type === t ? "border-primary bg-primary/5" : "border-gray-100 bg-white"
                   }`}
@@ -121,7 +135,7 @@ function MissionCreateModal({ onClose }: { onClose: () => void }) {
               );
             })}
           </div>
-          <p className="text-xs text-gray-500 mt-2 bg-gray-50 rounded-xl px-3 py-2">{TYPE_LABELS[type].desc}</p>
+          <p className="text-xs text-gray-500 mt-2 bg-gray-50 rounded-xl px-3 py-2">{TYPE_LABELS[type].desc}{mission ? " · 종류는 수정할 수 없어요." : ""}</p>
         </div>
 
         <div>
@@ -204,13 +218,14 @@ function MissionCreateModal({ onClose }: { onClose: () => void }) {
           )}
         </div>
 
-        {type === "activity" && (
+        {(
           <div className="space-y-4 bg-orange-50/50 rounded-[18px] p-4 border border-orange-100">
             <div>
               <p className="text-sm font-bold text-gray-600 mb-2">반복</p>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-3 gap-2">
                 {([
                   { v: "daily" as MissionScheduleType, label: "매일", emoji: "🔁" },
+                  { v: "weekly" as MissionScheduleType, label: "매주", emoji: "🗓️" },
                   { v: "once" as MissionScheduleType, label: "특정일 하루", emoji: "📅" },
                 ]).map(opt => (
                   <button
@@ -243,7 +258,31 @@ function MissionCreateModal({ onClose }: { onClose: () => void }) {
               </div>
             )}
 
-            {scheduleType === "daily" && (
+            {scheduleType === "weekly" && (
+              <div>
+                <p className="text-sm font-bold text-gray-600 mb-2 flex items-center gap-1">
+                  <CalendarDays className="w-4 h-4" /> 수행 요일
+                </p>
+                <div className="grid grid-cols-7 gap-1.5">
+                  {WEEKDAYS.map(day => {
+                    const selected = weeklyDays.includes(day.value);
+                    return (
+                      <button
+                        key={day.value}
+                        onClick={() => setWeeklyDays(current => selected ? current.filter(value => value !== day.value) : [...current, day.value].sort())}
+                        className={`aspect-square rounded-full text-xs font-black border-2 ${selected ? "border-primary bg-primary text-white" : "border-gray-200 bg-white text-gray-500"}`}
+                        data-testid={`weekday-${day.value}`}
+                      >
+                        {day.label}
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="text-[11px] text-gray-400 mt-2">선택한 요일마다 하루 한 번 수행할 수 있어요.</p>
+              </div>
+            )}
+
+            {type === "activity" && scheduleType === "daily" && (
               <div>
                 <p className="text-sm font-bold text-gray-600 mb-2 flex items-center gap-1">
                   <RefreshCw className="w-4 h-4" /> 수행 횟수
@@ -286,7 +325,7 @@ function MissionCreateModal({ onClose }: { onClose: () => void }) {
               </div>
             )}
 
-            <div>
+            {type === "activity" && <><div>
               <p className="text-sm font-bold text-gray-600 mb-1.5 flex items-center gap-1">
                 <Clock className="w-4 h-4" /> 마감 시간 (선택)
               </p>
@@ -309,7 +348,7 @@ function MissionCreateModal({ onClose }: { onClose: () => void }) {
                 <Camera className="w-4 h-4" /> 인증샷 필수
               </span>
               {requiresPhoto ? <ToggleRight className="w-7 h-7 text-primary" /> : <ToggleLeft className="w-7 h-7 text-gray-300" />}
-            </button>
+            </button></>}
           </div>
         )}
 
@@ -319,7 +358,7 @@ function MissionCreateModal({ onClose }: { onClose: () => void }) {
           className="w-full h-[52px] rounded-[16px] font-bold text-base bg-primary hover:bg-primary/90 text-white"
           data-testid="btn-submit-mission"
         >
-          {saving ? "저장 중..." : "미션 추가하기 🚀"}
+          {saving ? "저장 중..." : mission ? "수정 내용 저장하기" : "미션 추가하기 🚀"}
         </Button>
       </motion.div>
     </div>
@@ -394,11 +433,15 @@ function PendingCard({ log, onApprove, onReject }: { log: PendingLog; onApprove:
 }
 
 function MissionMeta({ m }: { m: Mission }) {
-  if (m.type !== "activity") return null;
+  const scheduleLabel = m.scheduleType === "once"
+    ? (m.scheduledDate ?? "지정일")
+    : m.scheduleType === "weekly"
+      ? `매주 ${(m.weeklyDays ?? []).map(value => WEEKDAYS.find(day => day.value === value)?.label).filter(Boolean).join("·")}`
+      : "매일";
   return (
     <div className="flex flex-wrap gap-1.5 mt-1.5">
       <span className="inline-flex items-center gap-1 text-[10px] font-bold text-gray-500 bg-gray-50 rounded-full px-2 py-0.5">
-        <CalendarDays className="w-2.5 h-2.5" /> {m.scheduleType === "once" ? (m.scheduledDate ?? "지정일") : "매일"}
+        <CalendarDays className="w-2.5 h-2.5" /> {scheduleLabel}
       </span>
       {m.timeLimit && (
         <span className="inline-flex items-center gap-1 text-[10px] font-bold text-rose-500 bg-rose-50 rounded-full px-2 py-0.5">
@@ -434,6 +477,7 @@ export default function ParentMissionsPage() {
   const { missions, children, pendingLogs, missionLogs, updateMission, deleteMission, approveMissionLog, rejectMissionLog } = useAppContext();
   const { toast } = useToast();
   const [createOpen, setCreateOpen] = useState(false);
+  const [editingMission, setEditingMission] = useState<Mission | null>(null);
   const [tab, setTab] = useState<"missions" | "pending" | "history">("missions");
   const [selectedLog, setSelectedLog] = useState<MissionLog | null>(null);
 
@@ -531,6 +575,9 @@ export default function ParentMissionsPage() {
                         <MissionTargetBadge m={m} kids={children} />
                       </div>
                       <div className="flex items-center gap-1 shrink-0">
+                        <button onClick={() => setEditingMission(m)} className="p-1 rounded-lg text-blue-500 hover:bg-blue-50 transition-colors" aria-label={`${m.title} 수정`}>
+                          <Pencil className="w-4 h-4" />
+                        </button>
                         <button onClick={() => handleToggle(m)} className={`p-1 rounded-lg transition-colors ${m.isActive ? "text-green-500" : "text-gray-300"}`}>
                           {m.isActive ? <ToggleRight className="w-7 h-7" /> : <ToggleLeft className="w-7 h-7" />}
                         </button>
@@ -574,6 +621,10 @@ export default function ParentMissionsPage() {
 
       <AnimatePresence>
         {createOpen && <MissionCreateModal onClose={() => setCreateOpen(false)} />}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {editingMission && <MissionCreateModal mission={editingMission} onClose={() => setEditingMission(null)} />}
       </AnimatePresence>
 
       <AnimatePresence>
