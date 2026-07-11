@@ -1,13 +1,14 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
-import { Plus, ChevronRight, LogOut, UserPlus, PlusCircle, ClipboardList, Gift, Check, X } from "lucide-react";
-import { useAppContext } from "@/context/AppContext";
+import { Plus, ChevronRight, LogOut, UserPlus, PlusCircle, ClipboardList, Gift, Check, X, Settings2 } from "lucide-react";
+import { useAppContext, type ChildData } from "@/context/AppContext";
 import { Button } from "@/components/ui/button";
 import { BibleIllustration } from "@/components/BibleIllustration";
 import { TransactionItem } from "@/components/TransactionItem";
 import { ChildCreateModal } from "@/components/ChildCreateModal";
 import { ParentTopupModal } from "@/components/ParentTopupModal";
 import { PushNotificationCard } from "@/components/PushNotificationCard";
+import { ReadingProfileModal } from "@/components/ReadingProfileModal";
 
 const REQUEST_TYPE_META: Record<string, { emoji: string; label: string }> = {
   allowance: { emoji: "💸", label: "용돈 요청" },
@@ -17,9 +18,10 @@ const REQUEST_TYPE_META: Record<string, { emoji: string; label: string }> = {
 
 export default function DashboardPage() {
   const [_, setLocation] = useLocation();
-  const { parent, children, parentTransactions, logout, pendingLogs, missions, childRequests, resolveRequest, gifticonOrders } = useAppContext();
+  const { parent, children, parentTransactions, logout, pendingLogs, missions, childRequests, resolveRequest, gifticonOrders, refreshChildren } = useAppContext();
   const [createOpen, setCreateOpen] = useState(false);
   const [topupOpen, setTopupOpen] = useState(false);
+  const [readingProfileChild, setReadingProfileChild] = useState<ChildData | null>(null);
 
   if (!parent) {
     setLocation("/");
@@ -230,7 +232,7 @@ export default function DashboardPage() {
                           <p className="text-sm text-gray-400">{child.age}세</p>
                         </div>
                       </div>
-                      <div className="font-bold text-xl">{child.balance.toLocaleString("ko-KR")}P</div>
+                      <div className="flex items-center gap-2"><div className="font-bold text-xl">{child.balance.toLocaleString("ko-KR")}P</div><button onClick={() => setReadingProfileChild(child)} className="p-2 rounded-full bg-violet-50 text-violet-600" aria-label={`${child.name} 독서 AI 설정`}><Settings2 className="w-4 h-4" /></button></div>
                     </div>
                     {hasMissions ? (
                       <div>
@@ -287,6 +289,7 @@ export default function DashboardPage() {
 
       <ChildCreateModal open={createOpen} onClose={() => setCreateOpen(false)} />
       <ParentTopupModal open={topupOpen} onClose={() => setTopupOpen(false)} />
+      {readingProfileChild && <ReadingProfileModal child={readingProfileChild} onClose={() => setReadingProfileChild(null)} onSaved={refreshChildren} />}
     </div>
   );
 }

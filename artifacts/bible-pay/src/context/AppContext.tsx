@@ -19,6 +19,11 @@ export interface ChildData {
   balance: number;
   avatar: string;
   parentId: number;
+  grade: number | null;
+  readingLevel: "easy" | "normal" | "advanced";
+  aiAnswerLength: "short" | "normal" | "long";
+  explainDifficultWords: boolean;
+  dailyReadingRetryLimit: number;
 }
 
 export type TransactionType = "mission" | "charge" | "spend" | "gifticon" | "refund";
@@ -345,7 +350,7 @@ export function AppProvider({ children: reactChildren }: { children: ReactNode }
           setMissionLogs(logs);
         } else if (me.role === "child") {
           setRole("child");
-          setCurrentChild({ id: me.id, name: me.name, age: me.age, avatar: me.avatar, balance: me.balance, parentId: me.parentId });
+          setCurrentChild(me);
           const [txs, missionList, catalog, orders, logs] = await Promise.all([
             api.get<Transaction[]>("/transactions"),
             api.get<Mission[]>("/missions"),
