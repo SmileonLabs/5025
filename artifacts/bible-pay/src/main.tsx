@@ -22,4 +22,21 @@ if (import.meta.env.DEV && "serviceWorker" in navigator) {
     });
 }
 
+// Installed PWAs can stay open for days and keep rendering an older precached
+// bundle. Ask the browser to check for a new worker on every launch and reload
+// once when the new worker takes control, so children see newly deployed flows
+// without clearing their login or browser data manually.
+if (import.meta.env.PROD && "serviceWorker" in navigator) {
+  let refreshing = false;
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    if (refreshing) return;
+    refreshing = true;
+    window.location.reload();
+  });
+
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.getRegistration().then((registration) => registration?.update()).catch(() => {});
+  });
+}
+
 createRoot(document.getElementById("root")!).render(<App />);
