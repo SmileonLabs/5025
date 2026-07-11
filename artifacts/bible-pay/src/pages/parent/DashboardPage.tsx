@@ -136,6 +136,19 @@ export default function DashboardPage() {
       </div>
 
       <div className="px-6 space-y-8">
+        <section className="grid grid-cols-2 gap-3">
+          <button onClick={() => setLocation("/parent/books")} className="bg-violet-600 text-white rounded-[20px] p-4 text-left shadow-sm" data-testid="btn-register-book">
+            <BookOpen className="w-6 h-6 mb-3" />
+            <p className="font-black">일반도서 등록</p>
+            <p className="text-xs text-violet-100 mt-1">ISBN·목차 입력</p>
+          </button>
+          <button onClick={() => setLocation("/parent/reading-results")} className="bg-white border border-gray-200 rounded-[20px] p-4 text-left shadow-sm" data-testid="btn-reading-results">
+            <MessageCircle className="w-6 h-6 mb-3 text-violet-600" />
+            <p className="font-black text-gray-900">AI 독서 결과</p>
+            <p className="text-xs text-gray-500 mt-1">대화·포인트 확인</p>
+          </button>
+        </section>
+
         <PushNotificationCard />
 
         {pendingRequests.length > 0 && (

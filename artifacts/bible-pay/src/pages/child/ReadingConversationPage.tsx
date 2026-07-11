@@ -25,7 +25,7 @@ export default function ReadingConversationPage() {
   const [, setLocation] = useLocation();
   const params = useParams<{ missionId: string }>();
   const search = new URLSearchParams(useSearch());
-  const { currentChild, missions } = useAppContext();
+  const { currentChild, missions, loading: appLoading } = useAppContext();
   const { toast } = useToast();
   const missionId = Number(params.missionId);
   const mission = missions.find((item) => item.id === missionId);
@@ -45,6 +45,7 @@ export default function ReadingConversationPage() {
   const [sending, setSending] = useState(false);
   const [canComplete, setCanComplete] = useState(false);
   const [result, setResult] = useState<CompleteResponse | null>(null);
+  const [startError, setStartError] = useState<string | null>(null);
   const started = useRef(false);
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -59,16 +60,23 @@ export default function ReadingConversationPage() {
       setAttemptId(data.attempt.id);
       setMessages([data.message]);
     }).catch((error) => {
+      setStartError(error.message ?? "독서 대화를 시작하지 못했어요.");
       toast({ title: error.message, variant: "destructive" });
     }).finally(() => setLoading(false));
   }, [book, bookId, chapter, currentChild, mission, missionId, sourceLabel, sourceType, toast, unitId, validSource]);
 
   useEffect(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), [messages, sending]);
 
-  if (!currentChild) { setLocation("/login"); return null; }
+  useEffect(() => {
+    if (!appLoading && !currentChild) setLocation("/login");
+  }, [appLoading, currentChild, setLocation]);
+
+  if (appLoading) {
+    return <div className="min-h-[100dvh] bg-slate-50 flex items-center justify-center"><Loader2 className="w-7 h-7 animate-spin text-violet-500" /></div>;
+  }
+  if (!currentChild) return null;
   if (!mission || !validSource) {
-    setLocation(backPath);
-    return null;
+    return <div className="min-h-[100dvh] bg-slate-50 flex items-center justify-center p-6"><section className="bg-white rounded-3xl border p-6 text-center max-w-sm w-full"><p className="text-3xl mb-3">📖</p><h1 className="font-black text-lg">읽기 정보를 찾지 못했어요</h1><p className="text-sm text-gray-500 mt-2">미션 목록으로 돌아가 다시 선택해 주세요.</p><button onClick={() => setLocation("/child/missions")} className="mt-5 w-full rounded-xl bg-gray-900 text-white py-3 font-bold">미션으로 돌아가기</button></section></div>;
   }
 
   const send = async (event: FormEvent) => {
@@ -119,6 +127,15 @@ export default function ReadingConversationPage() {
       <main className="flex-1 px-4 py-5 space-y-3 overflow-y-auto pb-40">
         <div className="bg-amber-50 text-amber-800 rounded-2xl px-4 py-3 text-xs leading-relaxed">읽은 내용에서 궁금한 점을 질문해 보세요. 관련 없는 질문만 하면 0P이며 읽기 완료로 표시되지 않아요.</div>
         {loading && <div className="flex justify-center py-16"><Loader2 className="animate-spin text-violet-500" /></div>}
+        {startError && (
+          <section className="bg-white border border-rose-200 rounded-3xl p-6 text-center">
+            <p className="text-3xl mb-3">😥</p>
+            <h2 className="font-black text-lg">대화를 시작하지 못했어요</h2>
+            <p className="text-sm text-gray-600 mt-2">{startError}</p>
+            <button onClick={() => window.location.reload()} className="mt-5 w-full rounded-xl bg-violet-500 text-white py-3 font-bold">다시 시도하기</button>
+            <button onClick={() => setLocation(backPath)} className="mt-2 w-full rounded-xl bg-gray-100 text-gray-700 py-3 font-bold">읽은 범위 다시 선택</button>
+          </section>
+        )}
         {messages.map((message, index) => (
           <div key={index} className={`flex ${message.role === "child" ? "justify-end" : "justify-start"}`}>
             <div className={`max-w-[84%] px-4 py-3 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap ${message.role === "child" ? "bg-violet-500 text-white rounded-br-md" : "bg-white border shadow-sm text-gray-800 rounded-bl-md"}`}>{message.content}</div>
