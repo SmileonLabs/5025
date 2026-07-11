@@ -11,6 +11,7 @@ import topupsRouter from "./topups";
 import gifticonsRouter from "./gifticons";
 import adminRouter from "./admin";
 import storageRouter from "./storage";
+import readingRouter from "./reading";
 
 const router: IRouter = Router();
 
@@ -26,5 +27,6 @@ router.use(topupsRouter);
 router.use(gifticonsRouter);
 router.use(adminRouter);
 router.use(storageRouter);
+router.use(readingRouter);
 
 export default router;

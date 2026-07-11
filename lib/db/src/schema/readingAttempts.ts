@@ -19,6 +19,8 @@ export const readingAttemptsTable = pgTable("reading_attempts", {
   missionId: integer("mission_id").notNull().references(() => missionsTable.id, { onDelete: "cascade" }),
   childId: integer("child_id").notNull().references(() => childrenTable.id, { onDelete: "cascade" }),
   readingUnitKey: text("reading_unit_key").notNull(),
+  sourceLabel: text("source_label").notNull(),
+  readingSummary: text("reading_summary"),
   status: text("status").notNull().$type<"in_progress" | "failed" | "completed" | "abandoned">().default("in_progress"),
   childMessageCount: integer("child_message_count").notNull().default(0),
   offTopicCount: integer("off_topic_count").notNull().default(0),

@@ -39,6 +39,8 @@ CREATE TABLE IF NOT EXISTS "reading_attempts" (
   "mission_id" integer NOT NULL REFERENCES "missions"("id") ON DELETE CASCADE,
   "child_id" integer NOT NULL REFERENCES "children"("id") ON DELETE CASCADE,
   "reading_unit_key" text NOT NULL,
+  "source_label" text NOT NULL,
+  "reading_summary" text,
   "status" text NOT NULL DEFAULT 'in_progress',
   "child_message_count" integer NOT NULL DEFAULT 0,
   "off_topic_count" integer NOT NULL DEFAULT 0,
