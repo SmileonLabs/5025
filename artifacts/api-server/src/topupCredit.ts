@@ -32,6 +32,15 @@ export async function getTopupByOrder(params: {
   return topup ?? null;
 }
 
+export async function getTopupByOrderId(orderId: string) {
+  const [topup] = await db
+    .select()
+    .from(topupsTable)
+    .where(eq(topupsTable.stripeSessionId, orderId))
+    .limit(1);
+  return topup ?? null;
+}
+
 export async function completePendingBudgetTopup(params: {
   parentId: number;
   orderId: string;

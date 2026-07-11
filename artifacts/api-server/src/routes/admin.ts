@@ -2,8 +2,10 @@ import { Router, type IRouter } from "express";
 import { timingSafeEqual } from "node:crypto";
 import { z } from "zod/v4";
 import { getAdminPassword, requireAdmin } from "../lib/adminAuth";
+import { rateLimit } from "../lib/security";
 
 const router: IRouter = Router();
+const adminLoginLimit = rateLimit({ prefix: "admin-auth", windowMs: 15 * 60_000, max: 5 });
 
 /** Constant-time password comparison that does not leak length via early exit. */
 function passwordMatches(input: string, expected: string): boolean {
@@ -18,7 +20,7 @@ function passwordMatches(input: string, expected: string): boolean {
 }
 
 // POST /api/admin/login — exchange the operator password for an admin session
-router.post("/admin/login", (req, res) => {
+router.post("/admin/login", adminLoginLimit, (req, res) => {
   const adminPw = getAdminPassword();
   if (!adminPw) {
     res.status(503).json({ error: "운영자 기능이 아직 설정되지 않았어요." });

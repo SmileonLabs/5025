@@ -6,12 +6,12 @@
   "scripts": {
     "dev": "vite --config vite.config.ts --host 0.0.0.0",
     "build": "vite build --config vite.config.ts",
-    "build:mobile": "PORT=${PORT:-5173} BASE_PATH=${BASE_PATH:-/} vite build --config vite.config.ts",
+    "build:mobile": "vite build --config vite.config.ts",
     "cap": "cap",
-    "cap:sync": "PORT=${PORT:-5173} BASE_PATH=${BASE_PATH:-/} vite build --config vite.config.ts && cap sync",
-    "cap:copy": "PORT=${PORT:-5173} BASE_PATH=${BASE_PATH:-/} vite build --config vite.config.ts && cap copy",
-    "android": "PORT=${PORT:-5173} BASE_PATH=${BASE_PATH:-/} vite build --config vite.config.ts && cap sync && cap open android",
-    "ios": "PORT=${PORT:-5173} BASE_PATH=${BASE_PATH:-/} vite build --config vite.config.ts && cap sync && cap open ios",
+    "cap:sync": "vite build --config vite.config.ts && cap sync",
+    "cap:copy": "vite build --config vite.config.ts && cap copy",
+    "android": "vite build --config vite.config.ts && cap sync && cap open android",
+    "ios": "vite build --config vite.config.ts && cap sync && cap open ios",
     "serve": "vite preview --config vite.config.ts --host 0.0.0.0",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.sw.json --noEmit"
   },
