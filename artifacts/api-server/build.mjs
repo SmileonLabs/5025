@@ -30,8 +30,6 @@ async function buildAll() {
     external: [
       "*.node",
       "openai",
-      "stripe",
-      "stripe-replit-sync",
       "p-limit",
       "p-retry",
       "zod",
