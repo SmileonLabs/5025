@@ -3,6 +3,7 @@ import { and, asc, eq, inArray } from "drizzle-orm";
 import { z } from "zod/v4";
 import { bookReadingUnitsTable, booksTable, childrenTable, db, missionsTable } from "@workspace/db";
 import { readingFeatureFlags } from "../lib/featureFlags";
+import { openai } from "@workspace/integrations-openai-ai-server";
 
 const router = Router();
 const isbnPattern = /^(?:\d{9}[\dX]|\d{13})$/;
@@ -20,7 +21,7 @@ type BookLookupResult = {
   coverUrl: string | null;
   description: string | null;
   metadataSource: "google_books" | "open_library";
-  units: [];
+  units: string[];
 };
 
 async function lookupGoogleBooks(isbn: string, apiKey: string): Promise<BookLookupResult | null> {
@@ -70,6 +71,20 @@ async function lookupOpenLibrary(isbn: string): Promise<BookLookupResult | null>
   if (!response.ok) throw new Error(`Open Library lookup failed: ${response.status}`);
   const info = ((await response.json()) as Record<string, any>)[key];
   if (!info) return null;
+  let units: string[] = [];
+  if (typeof info.key === "string" && /^\/books\/OL\d+M$/.test(info.key)) {
+    try {
+      const editionResponse = await fetch(`https://openlibrary.org${info.key}.json`, { signal: AbortSignal.timeout(10_000) });
+      if (editionResponse.ok) {
+        const edition = (await editionResponse.json()) as any;
+        units = (edition.table_of_contents ?? [])
+          .map((item: any) => typeof item === "string" ? item : item?.title ?? item?.label)
+          .filter((title: unknown): title is string => typeof title === "string" && title.trim().length > 0)
+          .map((title: string) => title.trim())
+          .slice(0, 100);
+      }
+    } catch { /* TOC is optional */ }
+  }
   return {
     isbn,
     title: info.title,
@@ -78,7 +93,7 @@ async function lookupOpenLibrary(isbn: string): Promise<BookLookupResult | null>
     coverUrl: info.cover?.medium ?? info.cover?.small ?? null,
     description: info.notes ?? null,
     metadataSource: "open_library",
-    units: [],
+    units,
   };
 }
 
@@ -91,11 +106,41 @@ router.get("/books/lookup", requireParent, async (req, res) => {
   try {
     let book: BookLookupResult | null = null;
     try { book = await lookupGoogleBooks(isbn, apiKey); } catch { /* fall through to Open Library */ }
-    if (!book) book = await lookupOpenLibrary(isbn);
+    let openLibraryBook: BookLookupResult | null = null;
+    try { openLibraryBook = await lookupOpenLibrary(isbn); } catch { /* metadata fallback remains optional */ }
+    if (!book) book = openLibraryBook;
+    else if (openLibraryBook?.units.length) book.units = openLibraryBook.units;
     if (!book) { res.status(404).json({ error: "ISBN에 해당하는 책을 찾지 못했어요. 직접 입력해 주세요." }); return; }
     res.json(book);
   } catch {
     res.status(502).json({ error: "도서 정보를 조회하지 못했어요." });
+  }
+});
+
+const ExtractTocBody = z.object({
+  imageDataUrl: z.string().max(8_000_000).regex(/^data:image\/(?:jpeg|jpg|png|webp);base64,/i),
+});
+
+router.post("/books/extract-toc", requireParent, async (req, res) => {
+  const parsed = ExtractTocBody.safeParse(req.body);
+  if (!parsed.success) { res.status(400).json({ error: "10MB 이하의 JPG, PNG 또는 WebP 목차 사진을 선택해 주세요." }); return; }
+  try {
+    const completion = await openai.chat.completions.create({
+      model: "gpt-5-mini",
+      max_completion_tokens: 3000,
+      messages: [{ role: "user", content: [
+        { type: "text", text: "이 사진은 책의 목차 페이지입니다. 장/절/부 제목을 읽는 순서대로 추출하세요. 페이지 번호와 점선은 제거하세요. 반드시 {\"units\":[\"제목1\",\"제목2\"]} JSON만 반환하세요. 보이지 않는 제목은 추측하지 마세요." },
+        { type: "image_url", image_url: { url: parsed.data.imageDataUrl, detail: "high" } },
+      ] }],
+    });
+    const content = completion.choices[0]?.message?.content ?? "";
+    const json = content.match(/\{[\s\S]*\}/)?.[0];
+    if (!json) throw new Error("No JSON returned");
+    const result = z.object({ units: z.array(z.string().trim().min(1).max(200)).min(1).max(100) }).parse(JSON.parse(json));
+    res.json(result);
+  } catch (error) {
+    req.log.error({ err: error }, "TOC image extraction failed");
+    res.status(502).json({ error: "목차를 읽지 못했어요. 사진을 선명하게 다시 찍어 주세요." });
   }
 });
 
