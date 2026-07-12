@@ -283,9 +283,13 @@ router.post("/missions/:id/submit", requireChild, async (req, res) => {
   // Activity type → pending parent approval (스케줄·마감·인증샷 검증)
   if (mission.type === "activity") {
     const actBody = z
-      .object({ photoUrl: z.string().startsWith("/objects/").max(500).optional() })
+      .object({
+        photoUrl: z.string().startsWith("/objects/").max(500).optional(),
+        reflection: z.string().trim().max(500).optional(),
+      })
       .safeParse(req.body);
     const photoUrl = actBody.success ? actBody.data.photoUrl : undefined;
+    const activityNote = actBody.success ? actBody.data.reflection : undefined;
 
     // 인증샷 필수 미션인데 사진이 없으면 거부
     if (mission.requiresPhoto && !photoUrl) {
@@ -320,6 +324,10 @@ router.post("/missions/:id/submit", requireChild, async (req, res) => {
         res.status(409).json({ error: `이 미션은 ${mission.scheduledDate}에 할 수 있어요.` });
         return;
       }
+    }
+    if (!mission.requiresPhoto && (!activityNote || activityNote.length < 5)) {
+      res.status(400).json({ error: "완료한 내용을 5자 이상 적어주세요." });
+      return;
     }
     if (mission.scheduleType === "weekly") {
       const weekday = new Date(`${todayKst}T00:00:00Z`).getUTCDay();
@@ -386,7 +394,7 @@ router.post("/missions/:id/submit", requireChild, async (req, res) => {
 
       const [inserted] = await tx
         .insert(missionLogsTable)
-        .values({ missionId, childId, status: "requested", photoUrl: photoUrl ?? null })
+        .values({ missionId, childId, status: "requested", photoUrl: photoUrl ?? null, reflection: activityNote ?? null })
         .returning();
       return { ok: true, log: inserted };
     });

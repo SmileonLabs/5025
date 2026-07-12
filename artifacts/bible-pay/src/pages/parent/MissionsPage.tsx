@@ -406,6 +406,13 @@ function PendingCard({ log, onApprove, onReject }: { log: PendingLog; onApprove:
         />
       )}
 
+      {log.reflection && (
+        <div className="mb-3 rounded-[14px] bg-blue-50 px-4 py-3 border border-blue-100">
+          <p className="text-[11px] font-black text-blue-500 mb-1">아이가 작성한 완료 내용</p>
+          <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">{log.reflection}</p>
+        </div>
+      )}
+
       <p className="text-xs text-gray-400 mb-3">
         <Clock className="w-3 h-3 inline mr-1" />
         {new Date(log.requestedAt).toLocaleString("ko-KR", { month: "numeric", day: "numeric", hour: "numeric", minute: "numeric" })}

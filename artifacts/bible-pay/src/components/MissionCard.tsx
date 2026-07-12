@@ -49,6 +49,7 @@ export function MissionCard({ mission, childId }: MissionCardProps) {
   const [done, setDone] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [activityNote, setActivityNote] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
 
   const info = TYPE_INFO[mission.type];
@@ -95,11 +96,15 @@ export function MissionCard({ mission, childId }: MissionCardProps) {
       toast({ title: "인증샷을 먼저 골라주세요 📸", variant: "destructive" });
       return;
     }
+    if (!mission.requiresPhoto && activityNote.trim().length < 5) {
+      toast({ title: "완료한 내용을 5자 이상 적어주세요.", variant: "destructive" });
+      return;
+    }
 
     setLoading(true);
     try {
       const photoUrl = file ? await uploadPhoto(file) : undefined;
-      await submitMission(mission.id, { photoUrl });
+      await submitMission(mission.id, { photoUrl, reflection: mission.requiresPhoto ? undefined : activityNote.trim() });
       setDone(true);
       toast({ title: "📨 완료 요청을 보냈어요!", description: "부모님이 확인하면 용돈이 지급돼요." });
     } catch (err: any) {
@@ -165,19 +170,20 @@ export function MissionCard({ mission, childId }: MissionCardProps) {
         <p className="text-xs text-gray-500 mb-3 bg-violet-50 rounded-xl px-3 py-2">📚 읽은 목차를 고르고 AI와 궁금한 점을 대화해요. 관련 없는 질문은 완료되지 않아요.</p>
       )}
 
-      {/* 인증샷 선택 / 미리보기 (activity & 제출 전) */}
+      {/* 인증샷 또는 완료 글 작성 (activity & 제출 전) */}
       {isActivity && !done && !limitReached && childId && (
         <div className="mb-3">
-          <input
-            ref={inputRef}
-            type="file"
-            accept="image/*"
-            capture="environment"
-            onChange={pickFile}
-            className="hidden"
-            data-testid={`mission-photo-input-${mission.id}`}
-          />
-          {previewUrl ? (
+          {mission.requiresPhoto ? <>
+            <input
+              ref={inputRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              onChange={pickFile}
+              className="hidden"
+              data-testid={`mission-photo-input-${mission.id}`}
+            />
+            {previewUrl ? (
             <div className="relative">
               <img src={previewUrl} alt="인증샷 미리보기" className="w-full max-h-52 object-cover rounded-[14px] border border-gray-100" />
               <div className="absolute top-2 right-2 flex gap-1.5">
@@ -197,14 +203,30 @@ export function MissionCard({ mission, childId }: MissionCardProps) {
                 </button>
               </div>
             </div>
-          ) : (
+            ) : (
             <button
               onClick={() => inputRef.current?.click()}
               className="w-full py-3 rounded-[14px] border-2 border-dashed border-gray-200 text-gray-500 font-bold text-sm flex items-center justify-center gap-2 hover:border-orange-300 hover:text-orange-500 transition-colors"
               data-testid={`mission-photo-pick-${mission.id}`}
             >
-              <Camera className="w-4 h-4" /> {mission.requiresPhoto ? "인증샷 찍기 / 올리기" : "인증샷 추가 (선택)"}
+              <Camera className="w-4 h-4" /> 인증샷 찍기 / 올리기
             </button>
+            )}
+          </> : (
+            <div>
+              <label htmlFor={`mission-note-${mission.id}`} className="block text-sm font-bold text-gray-700 mb-2">✍️ 어떻게 미션을 완료했나요?</label>
+              <textarea
+                id={`mission-note-${mission.id}`}
+                value={activityNote}
+                onChange={(event) => setActivityNote(event.target.value)}
+                maxLength={500}
+                rows={3}
+                placeholder="완료한 내용을 부모님께 알려주세요. (5자 이상)"
+                className="w-full resize-none rounded-[14px] border border-gray-200 px-4 py-3 text-sm focus:outline-none focus:border-orange-400"
+                data-testid={`mission-note-${mission.id}`}
+              />
+              <p className="mt-1 text-right text-[11px] text-gray-400">{activityNote.length}/500</p>
+            </div>
           )}
         </div>
       )}

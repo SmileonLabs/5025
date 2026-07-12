@@ -519,9 +519,14 @@ app.post("/api/missions/:id/submit", async (c) => {
   }
 
   if (mission.type === "activity") {
-    const actBody = z.object({ photoUrl: z.string().startsWith("/objects/").max(500).optional() }).safeParse(body);
+    const actBody = z.object({
+      photoUrl: z.string().startsWith("/objects/").max(500).optional(),
+      reflection: z.string().trim().max(500).optional(),
+    }).safeParse(body);
     const photoUrl = actBody.success ? actBody.data.photoUrl : undefined;
+    const activityNote = actBody.success ? actBody.data.reflection : undefined;
     if (mission.requiresPhoto && !photoUrl) return jsonError(c, 400, "인증샷을 올려주세요.");
+    if (!mission.requiresPhoto && (!activityNote || activityNote.length < 5)) return jsonError(c, 400, "완료한 내용을 5자 이상 적어주세요.");
 
     if (mission.timeLimit) {
       const nowKstHHMM = new Intl.DateTimeFormat("en-GB", {
@@ -560,7 +565,7 @@ app.post("/api/missions/:id/submit", async (c) => {
       return jsonError(c, 409, mission.scheduleType !== "once" ? "오늘은 이미 완료 요청했어요." : "이미 완료 요청한 미션이에요.");
     }
 
-    const [log] = await db.insert(missionLogsTable).values({ missionId, childId, status: "requested", photoUrl: photoUrl ?? null }).returning();
+    const [log] = await db.insert(missionLogsTable).values({ missionId, childId, status: "requested", photoUrl: photoUrl ?? null, reflection: activityNote ?? null }).returning();
     sendPushToParent(c.env, child.parentId, {
       title: "미션 승인 요청",
       body: `${child.name}님이 '${mission.title}' 미션을 완료했어요. 승인하면 ${mission.reward.toLocaleString("ko-KR")}P가 지급돼요.`,

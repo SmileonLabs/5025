@@ -120,6 +120,7 @@ export interface PendingLog {
   status: "requested";
   requestedAt: string;
   photoUrl: string | null;
+  reflection: string | null;
   mission: { id: number; title: string; reward: number; type: string };
   child: { id: number; name: string; avatar: string };
 }
