@@ -28,6 +28,7 @@ import ReadingConversationPage from "@/pages/child/ReadingConversationPage";
 import BookUnitsPage from "@/pages/child/BookUnitsPage";
 import ShopPage from "@/pages/child/ShopPage";
 import AdminPage from "@/pages/AdminPage";
+import GreatQuestionPage from "@/pages/child/GreatQuestionPage";
 
 const queryClient = new QueryClient();
 
@@ -57,6 +58,7 @@ function Router() {
       <Route path="/child/quiz/:missionId" component={QuizPage} />
       <Route path="/child/reading/:missionId" component={ReadingConversationPage} />
       <Route path="/child/book/:missionId" component={BookUnitsPage} />
+      <Route path="/child/great-question" component={GreatQuestionPage} />
 
       <Route path="/admin" component={AdminPage} />
 

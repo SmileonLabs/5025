@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from "react";
 import { useLocation } from "wouter";
-import { Bell, Award, ShoppingBag } from "lucide-react";
+import { Bell, Award, ShoppingBag, Sparkles } from "lucide-react";
 import { useAppContext } from "@/context/AppContext";
 import { BottomNav } from "@/components/BottomNav";
 import { MissionCard } from "@/components/MissionCard";
@@ -74,6 +74,12 @@ export default function HomePage() {
       </div>
 
       <div className="px-6 pt-6 space-y-6">
+        <button onClick={() => setLocation("/child/great-question")} className="w-full rounded-[24px] bg-gradient-to-r from-violet-600 to-indigo-500 p-5 text-left text-white shadow-lg relative overflow-hidden" data-testid="btn-great-question">
+          <Sparkles className="absolute right-5 top-5 w-9 h-9 text-amber-300" />
+          <p className="text-xs font-bold text-violet-100">매일 새로운 생각 모험</p>
+          <h2 className="mt-1 text-xl font-black">위대한 질문</h2>
+          <p className="mt-2 text-sm text-white/85">나만의 멋진 질문을 만들고 최대 2,000P 받기</p>
+        </button>
         {/* Hero Balance Card */}
         <div className="w-full bg-gradient-to-br from-primary via-primary/90 to-accent/80 rounded-[24px] p-6 text-white shadow-lg relative overflow-hidden">
           <div className="absolute top-0 right-0 w-32 h-32 bg-white/20 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2" />

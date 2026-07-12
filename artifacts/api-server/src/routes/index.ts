@@ -13,6 +13,7 @@ import adminRouter from "./admin";
 import storageRouter from "./storage";
 import readingRouter from "./reading";
 import booksRouter from "./books";
+import greatQuestionsRouter from "./greatQuestions";
 
 const router: IRouter = Router();
 
@@ -30,5 +31,6 @@ router.use(adminRouter);
 router.use(storageRouter);
 router.use(readingRouter);
 router.use(booksRouter);
+router.use(greatQuestionsRouter);
 
 export default router;
