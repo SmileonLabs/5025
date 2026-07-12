@@ -43,7 +43,7 @@ export default function DashboardPage() {
   };
 
   return (
-    <div className="min-h-[100dvh] bg-gray-50 pb-12">
+    <div className="min-h-[100dvh] w-full max-w-full overflow-x-clip bg-gray-50 pb-12">
       <div className="bg-white px-6 pt-12 pb-6 shadow-sm rounded-b-[32px] mb-6">
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-2xl font-bold text-gray-900">
@@ -88,10 +88,10 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        <div className="flex gap-3 mt-4">
+        <div className="grid grid-cols-3 gap-3 mt-4">
           <Button
             onClick={() => setLocation("/parent/charge")}
-            className="flex-1 h-[52px] rounded-[16px] text-base font-bold bg-primary hover:bg-primary/90 text-primary-foreground shadow-md"
+            className="w-full min-w-0 h-[52px] px-2 rounded-[16px] text-sm font-bold bg-primary hover:bg-primary/90 text-primary-foreground shadow-md"
             data-testid="btn-go-charge"
           >
             💰 용돈 채우기
@@ -99,7 +99,7 @@ export default function DashboardPage() {
           <Button
             onClick={() => setLocation("/parent/missions")}
             variant="outline"
-            className="h-[52px] px-4 rounded-[16px] font-bold border-gray-200 relative"
+            className="w-full min-w-0 h-[52px] px-2 rounded-[16px] font-bold border-gray-200 relative"
             data-testid="btn-go-missions"
           >
             <ClipboardList className="w-5 h-5" />
@@ -112,7 +112,7 @@ export default function DashboardPage() {
           <Button
             onClick={() => setLocation("/parent/gifticons")}
             variant="outline"
-            className="h-[52px] px-4 rounded-[16px] font-bold border-gray-200 relative"
+            className="w-full min-w-0 h-[52px] px-2 rounded-[16px] font-bold border-gray-200 relative"
             data-testid="btn-go-gifticons"
           >
             <Gift className="w-5 h-5" />
@@ -125,13 +125,13 @@ export default function DashboardPage() {
           <Button
             onClick={() => setCreateOpen(true)}
             variant="outline"
-            className="h-[52px] px-4 rounded-[16px] font-bold border-gray-200"
+            className="w-full min-w-0 h-[52px] px-2 rounded-[16px] font-bold border-gray-200"
             data-testid="btn-create-child-icon"
           >
             <UserPlus className="w-5 h-5" />
           </Button>
-          <Button onClick={() => setLocation("/parent/books")} variant="outline" className="h-[52px] px-4 rounded-[16px] font-bold border-gray-200" aria-label="일반도서 등록"><BookOpen className="w-5 h-5" /></Button>
-          <Button onClick={() => setLocation("/parent/reading-results")} variant="outline" className="h-[52px] px-4 rounded-[16px] font-bold border-gray-200" aria-label="AI 독서 결과"><MessageCircle className="w-5 h-5" /></Button>
+          <Button onClick={() => setLocation("/parent/books")} variant="outline" className="w-full min-w-0 h-[52px] px-2 rounded-[16px] font-bold border-gray-200" aria-label="일반도서 등록"><BookOpen className="w-5 h-5" /></Button>
+          <Button onClick={() => setLocation("/parent/reading-results")} variant="outline" className="w-full min-w-0 h-[52px] px-2 rounded-[16px] font-bold border-gray-200" aria-label="AI 독서 결과"><MessageCircle className="w-5 h-5" /></Button>
         </div>
       </div>
 
