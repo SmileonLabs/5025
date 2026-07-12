@@ -432,7 +432,12 @@ function FulfillSheet({
   onClose: () => void;
   onSubmit: (issued: { issuedPin?: string; issuedBarcode?: string; issuedImageUrl?: string }) => Promise<void>;
 }) {
-  const [pin, setPin] = useState("");
+  const [pin, setPin] = useState(() => {
+    const random = globalThis.crypto?.getRandomValues
+      ? globalThis.crypto.getRandomValues(new Uint32Array(1))[0] % 1_000_000
+      : Math.floor(Math.random() * 1_000_000);
+    return `5025-${String(order.id).padStart(6, "0")}-${String(random).padStart(6, "0")}`;
+  });
   const [barcode, setBarcode] = useState("");
   const [imageUrl, setImageUrl] = useState("");
   const [busy, setBusy] = useState(false);
@@ -461,7 +466,7 @@ function FulfillSheet({
         <p className="text-lg font-bold text-gray-900">{order.productName}</p>
       </div>
       <p className="text-xs text-gray-400 text-center mb-4 leading-relaxed">
-        핀번호·바코드·이미지는 선택이에요.
+        발급 코드는 자동으로 만들어져요. 필요하면 직접 수정할 수 있어요.
         <br />
         발급하면 바로 사용 완료로 처리돼요.
       </p>
@@ -469,7 +474,7 @@ function FulfillSheet({
         <Input
           value={pin}
           onChange={(e) => setPin(e.target.value)}
-          placeholder="핀번호 (선택)"
+          placeholder="발급 코드"
           className="rounded-[14px] border-gray-200"
           data-testid="input-pin"
         />
