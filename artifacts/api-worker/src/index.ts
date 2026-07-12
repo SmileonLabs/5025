@@ -913,7 +913,12 @@ app.patch("/api/gifticons/orders/:id/fulfill", async (c) => {
   if (!id) return jsonError(c, 400, "잘못된 요청이에요.");
   const parsed = ParentFulfillBody.safeParse(await readJson(c));
   if (!parsed.success) return jsonError(c, 400, "입력값을 확인해주세요.");
-  const order = await fulfillGifticonOrder(getDatabase(c.env), { orderId: id, requireParentId: parentId, ...parsed.data });
+  const order = await fulfillGifticonOrder(getDatabase(c.env), {
+    orderId: id,
+    requireParentId: parentId,
+    ...parsed.data,
+    markUsed: true,
+  });
   if (!order) return jsonError(c, 409, "발급할 수 없는 주문이에요.");
   return c.json(order);
 });

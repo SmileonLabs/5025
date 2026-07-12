@@ -751,7 +751,10 @@ export function AppProvider({ children: reactChildren }: { children: ReactNode }
     orderId: number,
     issued?: { issuedPin?: string; issuedBarcode?: string; issuedImageUrl?: string },
   ) => {
-    await api.patch<GifticonOrder>(`/gifticons/orders/${orderId}/fulfill`, issued ?? {});
+    const fulfilledOrder = await api.patch<GifticonOrder>(`/gifticons/orders/${orderId}/fulfill`, issued ?? {});
+    setGifticonOrders(previous =>
+      previous.map(order => order.id === fulfilledOrder.id ? fulfilledOrder : order),
+    );
     await refreshGifticonOrders();
   };
 

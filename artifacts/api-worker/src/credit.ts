@@ -340,19 +340,22 @@ export async function fulfillGifticonOrder(
     issuedBarcode?: string | null;
     issuedImageUrl?: string | null;
     requireParentId?: number;
+    markUsed?: boolean;
   },
 ): Promise<GifticonOrder | undefined> {
-  const { orderId, issuedPin, issuedBarcode, issuedImageUrl, requireParentId } = params;
+  const { orderId, issuedPin, issuedBarcode, issuedImageUrl, requireParentId, markUsed } = params;
   const conditions = [eq(gifticonOrdersTable.id, orderId), eq(gifticonOrdersTable.status, "requested")];
   if (requireParentId !== undefined) conditions.push(eq(gifticonOrdersTable.parentId, requireParentId));
+  const now = new Date();
   const [order] = await db
     .update(gifticonOrdersTable)
     .set({
-      status: "fulfilled",
+      status: markUsed ? "used" : "fulfilled",
       issuedPin: issuedPin ?? null,
       issuedBarcode: issuedBarcode ?? null,
       issuedImageUrl: issuedImageUrl ?? null,
-      fulfilledAt: new Date(),
+      fulfilledAt: now,
+      ...(markUsed ? { usedAt: now } : {}),
     })
     .where(and(...conditions))
     .returning();
