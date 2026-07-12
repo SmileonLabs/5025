@@ -15,11 +15,14 @@ function requireParent(req: any, res: any, next: any) {
 router.get("/books/lookup", requireParent, async (req, res) => {
   const isbn = normalizeIsbn(String(req.query.isbn ?? ""));
   if (!isbnPattern.test(isbn)) { res.status(400).json({ error: "ISBN 10자리 또는 13자리를 확인해 주세요." }); return; }
+  const apiKey = process.env["GOOGLE_BOOKS_API_KEY"]?.trim();
+  if (!apiKey) { res.status(503).json({ error: "Google Books API 설정이 필요해요." }); return; }
   try {
     const url = new URL("https://www.googleapis.com/books/v1/volumes");
-    url.searchParams.set("q", `isbn:${isbn}`); url.searchParams.set("maxResults", "1"); url.searchParams.set("projection", "lite");
+    url.searchParams.set("q", `isbn:${isbn}`); url.searchParams.set("maxResults", "1"); url.searchParams.set("projection", "lite"); url.searchParams.set("key", apiKey);
     const response = await fetch(url, { signal: AbortSignal.timeout(6000) });
-    if (!response.ok) throw new Error("lookup failed");
+    if (response.status === 429) { res.status(503).json({ error: "도서 조회 요청이 많아요. 잠시 후 다시 시도해 주세요." }); return; }
+    if (!response.ok) throw new Error(`Google Books lookup failed: ${response.status}`);
     const info = ((await response.json()) as any).items?.[0]?.volumeInfo;
     if (!info) { res.status(404).json({ error: "ISBN에 해당하는 책을 찾지 못했어요. 직접 입력해 주세요." }); return; }
     res.json({ isbn, title: info.title, author: info.authors?.join(", ") ?? null, publisher: info.publisher ?? null, coverUrl: info.imageLinks?.thumbnail?.replace("http://", "https://") ?? null, description: info.description ?? null, metadataSource: "google_books", units: [] });
