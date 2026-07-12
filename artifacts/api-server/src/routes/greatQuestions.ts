@@ -64,12 +64,16 @@ router.post("/great-questions/sessions/:id/messages", requireChild, async (req, 
   const row = Number.isInteger(id) ? await ownedSession(id, req.session.childId!) : null;
   if (!parsed.success || !row || row.session.status !== "in_progress") { res.status(400).json({ error: "진행 중인 대화를 확인해 주세요." }); return; }
   if (await moderateReadingMessage(parsed.data.content)) { res.status(400).json({ error: "그 이야기는 보호자와 먼저 나눠 주세요. 오늘 상황에서 궁금한 것을 물어볼까요?" }); return; }
-  await db.insert(greatQuestionMessagesTable).values({ sessionId: id, role: "child", content: parsed.data.content });
   const history = await db.select().from(greatQuestionMessagesTable).where(eq(greatQuestionMessagesTable.sessionId, id)).orderBy(greatQuestionMessagesTable.createdAt);
-  const decision = await createGreatQuestionReply({ age: row.child.age, domainLabel: row.session.domainLabel, scenario: row.session.scenario, messages: history.map((m) => ({ role: m.role, content: m.content })) });
+  const conversation = [
+    ...history.map((m) => ({ role: m.role, content: m.content })),
+    { role: "child" as const, content: parsed.data.content },
+  ];
+  const decision = await createGreatQuestionReply({ age: row.child.age, domainLabel: row.session.domainLabel, scenario: row.session.scenario, messages: conversation });
   await db.transaction(async (tx) => {
+    await tx.insert(greatQuestionMessagesTable).values({ sessionId: id, role: "child", content: parsed.data.content });
     await tx.insert(greatQuestionMessagesTable).values({ sessionId: id, role: "assistant", content: decision.reply });
-    await tx.update(greatQuestionSessionsTable).set({ childMessageCount: row.session.childMessageCount + 1 }).where(eq(greatQuestionSessionsTable.id, id));
+    await tx.update(greatQuestionSessionsTable).set({ childMessageCount: sql`${greatQuestionSessionsTable.childMessageCount} + 1` }).where(eq(greatQuestionSessionsTable.id, id));
   });
   res.json(decision);
 });
