@@ -4,6 +4,7 @@ import { z } from "zod/v4";
 import { childrenTable, db, greatQuestionMessagesTable, greatQuestionProfilesTable, greatQuestionSessionsTable, parentsTable, transactionsTable } from "@workspace/db";
 import { createDailyScenario, createGreatQuestionReply, evaluateGreatQuestion, greatQuestionPoints } from "../lib/greatQuestionAi";
 import { moderateReadingMessage } from "../lib/readingConversation";
+import { normalizeQuestionDecision } from "../lib/greatQuestionConversation";
 
 const router = Router();
 const DOMAINS = [
@@ -98,7 +99,8 @@ router.post("/great-questions/sessions/:id/messages", requireChild, async (req, 
     ...history.map((m) => ({ role: m.role, content: m.content })),
     { role: "child" as const, content: parsed.data.content },
   ];
-  const decision = await createGreatQuestionReply({ age: row.child.age, domainLabel: row.session.domainLabel, scenario: row.session.scenario, messages: conversation });
+  const aiDecision = await createGreatQuestionReply({ age: row.child.age, domainLabel: row.session.domainLabel, scenario: row.session.scenario, messages: conversation });
+  const decision = normalizeQuestionDecision(aiDecision, parsed.data.content);
   await db.transaction(async (tx) => {
     await tx.insert(greatQuestionMessagesTable).values({ sessionId: id, role: "child", content: parsed.data.content });
     await tx.insert(greatQuestionMessagesTable).values({ sessionId: id, role: "assistant", content: decision.reply });
