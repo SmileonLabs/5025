@@ -27,6 +27,7 @@ async function ownedSession(id: number, childId: number) {
 }
 
 router.get("/great-questions", requireChild, async (req, res) => {
+  res.set("Cache-Control", "no-store");
   const childId = req.session.childId!;
   const [profile] = await db.select().from(greatQuestionProfilesTable).where(eq(greatQuestionProfilesTable.childId, childId)).limit(1);
   const [session] = await db.select().from(greatQuestionSessionsTable).where(and(eq(greatQuestionSessionsTable.childId, childId), eq(greatQuestionSessionsTable.sessionDate, todayKst()))).limit(1);
@@ -35,6 +36,7 @@ router.get("/great-questions", requireChild, async (req, res) => {
 });
 
 router.get("/great-questions/notebook", requireChild, async (req, res) => {
+  res.set("Cache-Control", "no-store");
   const sessions = await db.select().from(greatQuestionSessionsTable)
     .where(and(eq(greatQuestionSessionsTable.childId, req.session.childId!), eq(greatQuestionSessionsTable.status, "completed")))
     .orderBy(desc(greatQuestionSessionsTable.completedAt))
