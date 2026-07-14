@@ -112,7 +112,7 @@ router.post("/great-questions/sessions/:id/messages", requireChild, async (req, 
 router.post("/great-questions/sessions/:id/complete", requireChild, async (req, res) => {
   const id = Number(req.params.id); const row = Number.isInteger(id) ? await ownedSession(id, req.session.childId!) : null;
   if (!row || row.session.status !== "in_progress") { res.status(409).json({ error: "이미 마친 대화이거나 찾을 수 없어요." }); return; }
-  if (row.session.childMessageCount < 2) { res.status(409).json({ error: "생각을 조금 더 이야기하고 나만의 질문을 만들어 보세요." }); return; }
+  if (row.session.childMessageCount < 1) { res.status(409).json({ error: "먼저 떠오르는 질문을 하나 들려주세요." }); return; }
   const history = await db.select().from(greatQuestionMessagesTable).where(eq(greatQuestionMessagesTable.sessionId, id)).orderBy(greatQuestionMessagesTable.createdAt);
   const evaluation = await evaluateGreatQuestion({ age: row.child.age, domainLabel: row.session.domainLabel, scenario: row.session.scenario, messages: history.map((m) => ({ role: m.role, content: m.content })) });
   const points = greatQuestionPoints(evaluation);
