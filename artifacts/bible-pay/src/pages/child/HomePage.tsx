@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from "react";
 import { useLocation } from "wouter";
-import { Bell, Award, ShoppingBag, Sparkles } from "lucide-react";
+import { Bell, Award, BookOpen, ShoppingBag, Sparkles } from "lucide-react";
 import { useAppContext } from "@/context/AppContext";
 import { BottomNav } from "@/components/BottomNav";
 import { MissionCard } from "@/components/MissionCard";
@@ -79,6 +79,11 @@ export default function HomePage() {
           <p className="text-xs font-bold text-violet-100">매일 새로운 생각 모험</p>
           <h2 className="mt-1 text-xl font-black">위대한 질문</h2>
           <p className="mt-2 text-sm text-white/85">나만의 멋진 질문을 만들고 최대 2,000P 받기</p>
+        </button>
+        <button onClick={() => setLocation("/child/great-question/notebook")} className="flex w-full items-center gap-3 rounded-[20px] border border-violet-100 bg-white p-4 text-left shadow-sm" data-testid="btn-great-question-notebook">
+          <span className="grid h-11 w-11 place-items-center rounded-2xl bg-violet-100 text-violet-600"><BookOpen className="h-5 w-5" /></span>
+          <span className="flex-1"><strong className="block text-gray-900">나의 위대한 질문 노트</strong><span className="text-xs text-gray-500">세상을 바꾸는 내 질문 모아보기</span></span>
+          <span className="text-violet-400">›</span>
         </button>
         {/* Hero Balance Card */}
         <div className="w-full bg-gradient-to-br from-primary via-primary/90 to-accent/80 rounded-[24px] p-6 text-white shadow-lg relative overflow-hidden">

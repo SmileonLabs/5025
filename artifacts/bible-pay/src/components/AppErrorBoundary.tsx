@@ -25,6 +25,11 @@ export class AppErrorBoundary extends Component<Props, State> {
           <p className="mt-2 text-sm leading-relaxed text-gray-500">
             잠시 연결이 불안정했어요. 아래 버튼을 눌러 다시 시작해 주세요.
           </p>
+          {import.meta.env.DEV && (
+            <p className="mt-3 break-words rounded-xl bg-red-50 p-3 text-left text-xs text-red-700">
+              {this.state.error.message || this.state.error.name}
+            </p>
+          )}
           <button
             className="mt-5 w-full rounded-xl bg-violet-500 py-3 font-bold text-white"
             onClick={() => window.location.reload()}

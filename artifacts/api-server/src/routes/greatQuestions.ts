@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { and, desc, eq, gte, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, sql } from "drizzle-orm";
 import { z } from "zod/v4";
 import { childrenTable, db, greatQuestionMessagesTable, greatQuestionProfilesTable, greatQuestionSessionsTable, parentsTable, transactionsTable } from "@workspace/db";
 import { createDailyScenario, createGreatQuestionReply, evaluateGreatQuestion, greatQuestionPoints } from "../lib/greatQuestionAi";
@@ -30,6 +30,35 @@ router.get("/great-questions", requireChild, async (req, res) => {
   const [session] = await db.select().from(greatQuestionSessionsTable).where(and(eq(greatQuestionSessionsTable.childId, childId), eq(greatQuestionSessionsTable.sessionDate, todayKst()))).limit(1);
   const messages = session ? await db.select().from(greatQuestionMessagesTable).where(eq(greatQuestionMessagesTable.sessionId, session.id)).orderBy(greatQuestionMessagesTable.createdAt) : [];
   res.json({ domains: DOMAINS, profile: profile ?? null, session: session ?? null, messages });
+});
+
+router.get("/great-questions/notebook", requireChild, async (req, res) => {
+  const sessions = await db.select().from(greatQuestionSessionsTable)
+    .where(and(eq(greatQuestionSessionsTable.childId, req.session.childId!), eq(greatQuestionSessionsTable.status, "completed")))
+    .orderBy(desc(greatQuestionSessionsTable.completedAt))
+    .limit(100);
+  if (sessions.length === 0) { res.json([]); return; }
+
+  const childMessages = await db.select().from(greatQuestionMessagesTable)
+    .where(and(
+      inArray(greatQuestionMessagesTable.sessionId, sessions.map((session) => session.id)),
+      eq(greatQuestionMessagesTable.role, "child"),
+    ))
+    .orderBy(greatQuestionMessagesTable.createdAt);
+  const lastQuestionBySession = new Map<number, string>();
+  for (const message of childMessages) lastQuestionBySession.set(message.sessionId, message.content);
+
+  res.json(sessions.map((session) => ({
+    id: session.id,
+    sessionDate: session.sessionDate,
+    domainLabel: session.domainLabel,
+    scenario: session.scenario,
+    questionTitle: session.questionTitle ?? session.evaluation?.questionTitle ?? "오늘의 위대한 질문",
+    finalQuestion: session.finalQuestion ?? session.evaluation?.greatQuestion ?? lastQuestionBySession.get(session.id) ?? "오늘의 생각을 멋진 질문으로 만들었어요.",
+    rewardPoints: session.rewardPoints,
+    reason: session.evaluation?.reason ?? "새로운 생각의 문을 여는 질문이에요.",
+    completedAt: session.completedAt,
+  })));
 });
 
 router.put("/great-questions/profile", requireChild, async (req, res) => {
@@ -87,7 +116,11 @@ router.post("/great-questions/sessions/:id/complete", requireChild, async (req, 
   const points = greatQuestionPoints(evaluation);
   if (points === 0) { res.json({ status: "in_progress", rewardPoints: 0, evaluation, message: "아직 오늘의 위대한 질문이 완성되지 않았어요. AI와 조금 더 이야기해 보세요." }); return; }
   const result = await db.transaction(async (tx) => {
-    const [locked] = await tx.update(greatQuestionSessionsTable).set({ status: "completed", rewardPoints: points, evaluation, completedAt: new Date() }).where(and(eq(greatQuestionSessionsTable.id, id), eq(greatQuestionSessionsTable.status, "in_progress"))).returning();
+    const [locked] = await tx.update(greatQuestionSessionsTable).set({
+      status: "completed", rewardPoints: points, evaluation,
+      finalQuestion: evaluation.greatQuestion, questionTitle: evaluation.questionTitle,
+      completedAt: new Date(),
+    }).where(and(eq(greatQuestionSessionsTable.id, id), eq(greatQuestionSessionsTable.status, "in_progress"))).returning();
     if (!locked) return null;
     const [parent] = await tx.update(parentsTable).set({ balance: sql`${parentsTable.balance} - ${points}` }).where(and(eq(parentsTable.id, row.child.parentId), gte(parentsTable.balance, points))).returning();
     if (!parent) throw new Error("PARENT_BALANCE");

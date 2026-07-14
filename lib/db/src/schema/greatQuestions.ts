@@ -9,6 +9,8 @@ export type GreatQuestionEvaluation = {
   originalityScore: number;
   clarityScore: number;
   reason: string;
+  greatQuestion?: string;
+  questionTitle?: string;
 };
 
 export const greatQuestionProfilesTable = pgTable("great_question_profiles", {
@@ -31,6 +33,8 @@ export const greatQuestionSessionsTable = pgTable("great_question_sessions", {
   childMessageCount: integer("child_message_count").notNull().default(0),
   rewardPoints: integer("reward_points").notNull().default(0),
   evaluation: jsonb("evaluation").$type<GreatQuestionEvaluation>(),
+  finalQuestion: text("final_question"),
+  questionTitle: text("question_title"),
   transactionId: integer("transaction_id").references(() => transactionsTable.id, { onDelete: "set null" }),
   startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
   completedAt: timestamp("completed_at", { withTimezone: true }),
