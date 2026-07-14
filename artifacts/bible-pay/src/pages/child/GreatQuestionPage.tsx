@@ -185,6 +185,26 @@ export default function GreatQuestionPage() {
       setBusy(false);
     }
   };
+  const resetChallenge = async () => {
+    if (!session || busy) return;
+    const willReturnPoints = result && result.rewardPoints > 0;
+    const message = willReturnPoints
+      ? `받은 ${result.rewardPoints.toLocaleString()}P는 돌아가고, 처음부터 다시 도전하게 돼요. 다시 시작할까?`
+      : "지금까지의 대화를 지우고 처음부터 다시 시작할까?";
+    if (!window.confirm(message)) return;
+    setBusy(true);
+    try {
+      await api.post<{ status: "reset" }>(`/great-questions/sessions/${session.id}/reset`, {});
+      setSession(null);
+      setMessages([]);
+      setResult(null);
+      await load();
+    } catch (e: any) {
+      toast({ title: e.message, variant: "destructive" });
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const hasChildQuestion = messages.some((message) => message.role === "child");
 
@@ -361,9 +381,17 @@ export default function GreatQuestionPage() {
             <p className="mt-3 text-sm leading-relaxed text-gray-700">
               {result.evaluation.reason}
             </p>
+            {result.rewardPoints < 2000 && (
+              <button
+                onClick={resetChallenge}
+                className="mt-5 w-full py-3 rounded-xl border border-violet-200 text-violet-700 font-bold"
+              >
+                처음부터 다시 도전하기
+              </button>
+            )}
             <button
               onClick={() => navigate("/child/great-question/notebook")}
-              className="mt-5 w-full py-3 rounded-xl bg-violet-600 text-white font-bold"
+              className="mt-2 w-full py-3 rounded-xl bg-violet-600 text-white font-bold"
             >
               위대한 질문 노트에 담기
             </button>
@@ -389,6 +417,14 @@ export default function GreatQuestionPage() {
                 내 질문 평가받기
               </button>
             )}
+            <button
+              type="button"
+              onClick={resetChallenge}
+              disabled={busy}
+              className="w-full py-2 text-sm text-gray-500 underline disabled:opacity-50"
+            >
+              처음부터 다시 하기
+            </button>
             <form onSubmit={send} className="flex gap-2">
               <input
                 value={input}
@@ -406,7 +442,7 @@ export default function GreatQuestionPage() {
             </form>
             {hasChildQuestion && (
               <p className="text-center text-xs text-gray-500">
-                내가 만든 질문을 평가받을 수 있어요.
+                상황과 이어지는 좋은 질문을 만들면 포인트를 받을 수 있어요.
               </p>
             )}
           </div>

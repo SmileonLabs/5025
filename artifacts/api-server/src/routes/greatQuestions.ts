@@ -17,6 +17,7 @@ const DOMAINS = [
 ] as const;
 const todayKst = () => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Seoul", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
 const requireChild = (req: any, res: any, next: any) => req.session?.childId ? next() : res.status(401).json({ error: "아이 로그인이 필요해요." });
+const hasQuestion = (content: string) => /[?？]|(왜|어떻게|무엇|뭐|누구|언제|어디|어떤|얼마나|할까|인가|인지|없을까|될까|줄까|줄래)/.test(content.replace(/\s/g, ""));
 
 async function ownedSession(id: number, childId: number) {
   const [row] = await db.select({ session: greatQuestionSessionsTable, child: childrenTable }).from(greatQuestionSessionsTable)
@@ -112,8 +113,9 @@ router.post("/great-questions/sessions/:id/messages", requireChild, async (req, 
 router.post("/great-questions/sessions/:id/complete", requireChild, async (req, res) => {
   const id = Number(req.params.id); const row = Number.isInteger(id) ? await ownedSession(id, req.session.childId!) : null;
   if (!row || row.session.status !== "in_progress") { res.status(409).json({ error: "이미 마친 대화이거나 찾을 수 없어요." }); return; }
-  if (row.session.childMessageCount < 1) { res.status(409).json({ error: "먼저 떠오르는 질문을 하나 들려주세요." }); return; }
   const history = await db.select().from(greatQuestionMessagesTable).where(eq(greatQuestionMessagesTable.sessionId, id)).orderBy(greatQuestionMessagesTable.createdAt);
+  const childQuestions = history.filter((message) => message.role === "child" && hasQuestion(message.content));
+  if (childQuestions.length === 0) { res.status(409).json({ error: "포인트는 상황과 연결된 질문을 만들었을 때 받을 수 있어요. 떠오르는 질문을 하나 들려줄래?" }); return; }
   const evaluation = await evaluateGreatQuestion({ age: row.child.age, domainLabel: row.session.domainLabel, scenario: row.session.scenario, messages: history.map((m) => ({ role: m.role, content: m.content })) });
   const points = greatQuestionPoints(evaluation);
   if (points === 0) { res.json({ status: "in_progress", rewardPoints: 0, evaluation, message: "아직 오늘의 위대한 질문이 완성되지 않았어요. AI와 조금 더 이야기해 보세요." }); return; }
@@ -134,6 +136,26 @@ router.post("/great-questions/sessions/:id/complete", requireChild, async (req, 
   if (result === "balance") { res.status(402).json({ error: "부모님 포인트가 부족해서 아직 보상을 받을 수 없어요." }); return; }
   if (!result) { res.status(409).json({ error: "이미 보상을 받았어요." }); return; }
   res.json({ status: "completed", rewardPoints: points, evaluation, childBalance: result.balance });
+});
+
+router.post("/great-questions/sessions/:id/reset", requireChild, async (req, res) => {
+  const id = Number(req.params.id); const row = Number.isInteger(id) ? await ownedSession(id, req.session.childId!) : null;
+  if (!row) { res.status(404).json({ error: "대화를 찾을 수 없어요." }); return; }
+  if (row.session.rewardPoints >= 2000) { res.status(409).json({ error: "2,000P를 받은 질문은 이미 가장 높은 보상이라 다시 도전할 수 없어요." }); return; }
+
+  const reset = await db.transaction(async (tx) => {
+    if (row.session.transactionId && row.session.rewardPoints > 0) {
+      const [child] = await tx.update(childrenTable).set({ balance: sql`${childrenTable.balance} - ${row.session.rewardPoints}` })
+        .where(and(eq(childrenTable.id, row.child.id), gte(childrenTable.balance, row.session.rewardPoints))).returning();
+      if (!child) return "spent" as const;
+      await tx.update(parentsTable).set({ balance: sql`${parentsTable.balance} + ${row.session.rewardPoints}` }).where(eq(parentsTable.id, row.child.parentId));
+      await tx.delete(transactionsTable).where(eq(transactionsTable.id, row.session.transactionId));
+    }
+    await tx.delete(greatQuestionSessionsTable).where(eq(greatQuestionSessionsTable.id, id));
+    return "reset" as const;
+  });
+  if (reset === "spent") { res.status(409).json({ error: "이미 사용한 포인트가 있어 다시 도전할 수 없어요." }); return; }
+  res.json({ status: "reset" });
 });
 
 export default router;
