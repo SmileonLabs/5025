@@ -40,15 +40,6 @@ type Result = {
   };
 };
 
-const RECOVERY_DOMAINS: Domain[] = [
-  { key: "people", label: "사람들이 더 행복하게 지내는 세상", emoji: "🌟" },
-  { key: "earth", label: "지구를 아름답게 지키는 세상", emoji: "🌏" },
-  { key: "invention", label: "불편한 것을 새롭게 바꾸는 세상", emoji: "💡" },
-  { key: "space", label: "우주와 아직 모르는 것을 탐험하는 세상", emoji: "🚀" },
-  { key: "fairness", label: "모두가 공평한 기회를 얻는 세상", emoji: "⚖️" },
-  { key: "health", label: "아픈 사람을 돕고 건강하게 사는 세상", emoji: "💚" },
-];
-
 export default function GreatQuestionPage() {
   const [, navigate] = useLocation();
   const { currentChild, loading: authLoading } = useAppContext();
@@ -96,16 +87,8 @@ export default function GreatQuestionPage() {
         return;
       }
       const message = e?.message ?? "대화 기록을 불러오지 못했어요.";
-      setState((current) => current ?? {
-        domains: RECOVERY_DOMAINS,
-        profile: null,
-        session: null,
-        messages: [],
-      });
-      setSession(null);
-      setMessages([]);
-      setLoadError("");
-      toast({ title: "이전 기록을 복구하지 못했어요. 새 질문 모험은 바로 시작할 수 있어요." });
+      setLoadError(message);
+      toast({ title: message, variant: "destructive" });
     }
   };
   useEffect(() => {
@@ -131,8 +114,8 @@ export default function GreatQuestionPage() {
   const choose = async (domainKey: string) => {
     setBusy(true);
     try {
-      const profile = await api.put<{ domainKey: string; domainLabel: string }>("/great-questions/profile", { domainKey });
-      setState((current) => current ? { ...current, profile } : current);
+      await api.put("/great-questions/profile", { domainKey });
+      await load();
     } catch (e: any) {
       toast({ title: e.message, variant: "destructive" });
     } finally {

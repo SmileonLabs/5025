@@ -1,6 +1,5 @@
 import app from "./app";
 import { logger } from "./lib/logger";
-import { pool } from "@workspace/db";
 
 const rawPort = process.env["PORT"];
 
@@ -18,16 +17,6 @@ if (Number.isNaN(port) || port <= 0) {
 
 async function main(): Promise<void> {
   logger.info("Using Toss Payments top-up flow");
-
-  // Replit's production database is separate from the development database.
-  // Keep old deployments readable when the notebook columns have not yet
-  // reached that production database through the normal post-merge migration.
-  await pool.query(`
-    ALTER TABLE great_question_sessions
-      ADD COLUMN IF NOT EXISTS final_question text;
-    ALTER TABLE great_question_sessions
-      ADD COLUMN IF NOT EXISTS question_title text;
-  `);
 
   app.listen(port, (err) => {
     if (err) {
