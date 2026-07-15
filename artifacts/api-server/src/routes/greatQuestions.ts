@@ -15,12 +15,31 @@ const DOMAINS = [
   { key: "fairness", label: "누구나 공평한 기회를 얻는 세상", emoji: "⚖️" },
   { key: "health", label: "아픈 사람을 돕고 건강하게 사는 세상", emoji: "💚" },
 ] as const;
+// The evaluation JSON already stores notebook title and final question. Keep
+// daily sessions compatible with databases created before notebook columns.
+const sessionFields = {
+  id: greatQuestionSessionsTable.id,
+  childId: greatQuestionSessionsTable.childId,
+  sessionDate: greatQuestionSessionsTable.sessionDate,
+  domainKey: greatQuestionSessionsTable.domainKey,
+  domainLabel: greatQuestionSessionsTable.domainLabel,
+  scenario: greatQuestionSessionsTable.scenario,
+  status: greatQuestionSessionsTable.status,
+  childMessageCount: greatQuestionSessionsTable.childMessageCount,
+  rewardPoints: greatQuestionSessionsTable.rewardPoints,
+  evaluation: greatQuestionSessionsTable.evaluation,
+  finalQuestion: sql<string | null>`NULL::text`,
+  questionTitle: sql<string | null>`NULL::text`,
+  transactionId: greatQuestionSessionsTable.transactionId,
+  startedAt: greatQuestionSessionsTable.startedAt,
+  completedAt: greatQuestionSessionsTable.completedAt,
+};
 const todayKst = () => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Seoul", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
 const requireChild = (req: any, res: any, next: any) => req.session?.childId ? next() : res.status(401).json({ error: "아이 로그인이 필요해요." });
 const hasQuestion = (content: string) => /[?？]|(왜|어떻게|무엇|뭐|누구|언제|어디|어떤|얼마나|할까|인가|인지|없을까|될까|줄까|줄래)/.test(content.replace(/\s/g, ""));
 
 async function ownedSession(id: number, childId: number) {
-  const [row] = await db.select({ session: greatQuestionSessionsTable, child: childrenTable }).from(greatQuestionSessionsTable)
+  const [row] = await db.select({ session: sessionFields, child: childrenTable }).from(greatQuestionSessionsTable)
     .innerJoin(childrenTable, eq(greatQuestionSessionsTable.childId, childrenTable.id))
     .where(and(eq(greatQuestionSessionsTable.id, id), eq(greatQuestionSessionsTable.childId, childId))).limit(1);
   return row;
@@ -30,14 +49,14 @@ router.get("/great-questions", requireChild, async (req, res) => {
   res.set("Cache-Control", "no-store");
   const childId = req.session.childId!;
   const [profile] = await db.select().from(greatQuestionProfilesTable).where(eq(greatQuestionProfilesTable.childId, childId)).limit(1);
-  const [session] = await db.select().from(greatQuestionSessionsTable).where(and(eq(greatQuestionSessionsTable.childId, childId), eq(greatQuestionSessionsTable.sessionDate, todayKst()))).limit(1);
+  const [session] = await db.select(sessionFields).from(greatQuestionSessionsTable).where(and(eq(greatQuestionSessionsTable.childId, childId), eq(greatQuestionSessionsTable.sessionDate, todayKst()))).limit(1);
   const messages = session ? await db.select().from(greatQuestionMessagesTable).where(eq(greatQuestionMessagesTable.sessionId, session.id)).orderBy(greatQuestionMessagesTable.createdAt) : [];
   res.json({ domains: DOMAINS, profile: profile ?? null, session: session ?? null, messages });
 });
 
 router.get("/great-questions/notebook", requireChild, async (req, res) => {
   res.set("Cache-Control", "no-store");
-  const sessions = await db.select().from(greatQuestionSessionsTable)
+  const sessions = await db.select(sessionFields).from(greatQuestionSessionsTable)
     .where(and(eq(greatQuestionSessionsTable.childId, req.session.childId!), eq(greatQuestionSessionsTable.status, "completed")))
     .orderBy(desc(greatQuestionSessionsTable.completedAt))
     .limit(100);
@@ -77,7 +96,7 @@ router.put("/great-questions/profile", requireChild, async (req, res) => {
 
 router.post("/great-questions/sessions", requireChild, async (req, res) => {
   const childId = req.session.childId!;
-  const [existing] = await db.select().from(greatQuestionSessionsTable).where(and(eq(greatQuestionSessionsTable.childId, childId), eq(greatQuestionSessionsTable.sessionDate, todayKst()))).limit(1);
+  const [existing] = await db.select(sessionFields).from(greatQuestionSessionsTable).where(and(eq(greatQuestionSessionsTable.childId, childId), eq(greatQuestionSessionsTable.sessionDate, todayKst()))).limit(1);
   if (existing) {
     const messages = await db.select().from(greatQuestionMessagesTable).where(eq(greatQuestionMessagesTable.sessionId, existing.id)).orderBy(greatQuestionMessagesTable.createdAt);
     res.json({ session: existing, messages }); return;
@@ -124,7 +143,6 @@ router.post("/great-questions/sessions/:id/complete", requireChild, async (req, 
   const result = await db.transaction(async (tx) => {
     const [locked] = await tx.update(greatQuestionSessionsTable).set({
       status: "completed", rewardPoints: points, evaluation,
-      finalQuestion: evaluation.greatQuestion, questionTitle: evaluation.questionTitle,
       completedAt: new Date(),
     }).where(and(eq(greatQuestionSessionsTable.id, id), eq(greatQuestionSessionsTable.status, "in_progress"))).returning();
     if (!locked) return null;
