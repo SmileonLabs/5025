@@ -16,7 +16,7 @@ export const missionLogsTable = pgTable(
     id: serial("id").primaryKey(),
     missionId: integer("mission_id").notNull().references(() => missionsTable.id, { onDelete: "cascade" }),
     childId: integer("child_id").notNull().references(() => childrenTable.id, { onDelete: "cascade" }),
-    status: text("status").notNull().$type<"completed" | "requested" | "approved" | "rejected">(),
+    status: text("status").notNull().$type<"completed" | "requested" | "approved" | "rejected" | "reverted">(),
     bibleBook: text("bible_book"),
     bibleChapter: integer("bible_chapter"),
     reflection: text("reflection"),

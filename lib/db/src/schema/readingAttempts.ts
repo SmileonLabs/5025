@@ -21,7 +21,7 @@ export const readingAttemptsTable = pgTable("reading_attempts", {
   readingUnitKey: text("reading_unit_key").notNull(),
   sourceLabel: text("source_label").notNull(),
   readingSummary: text("reading_summary"),
-  status: text("status").notNull().$type<"in_progress" | "failed" | "completed" | "abandoned">().default("in_progress"),
+  status: text("status").notNull().$type<"in_progress" | "failed" | "completed" | "abandoned" | "reset">().default("in_progress"),
   childMessageCount: integer("child_message_count").notNull().default(0),
   offTopicCount: integer("off_topic_count").notNull().default(0),
   rewardPoints: integer("reward_points").notNull().default(0),
@@ -30,6 +30,8 @@ export const readingAttemptsTable = pgTable("reading_attempts", {
   transactionId: integer("transaction_id").references(() => transactionsTable.id, { onDelete: "set null" }),
   startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
   completedAt: timestamp("completed_at", { withTimezone: true }),
+  resetAt: timestamp("reset_at", { withTimezone: true }),
+  resetReason: text("reset_reason"),
 }, (table) => [
   index("idx_reading_attempts_child_status").on(table.childId, table.status),
   uniqueIndex("uq_reading_attempt_completed_unit")

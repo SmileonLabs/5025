@@ -60,6 +60,7 @@ export async function resetReadingAttempt(params: {
   parentId: number;
   rewardPoints: number;
   transactionId: number | null;
+  sourceLabel: string;
 }) {
   return db.transaction(async (tx) => {
     if (params.transactionId && params.rewardPoints > 0) {
@@ -72,11 +73,21 @@ export async function resetReadingAttempt(params: {
       await tx.update(parentsTable)
         .set({ balance: sql`${parentsTable.balance} + ${params.rewardPoints}` })
         .where(eq(parentsTable.id, params.parentId));
-      await tx.delete(missionLogsTable).where(eq(missionLogsTable.transactionId, params.transactionId));
-      await tx.delete(transactionsTable).where(eq(transactionsTable.id, params.transactionId));
+      await tx.insert(transactionsTable).values({
+        childId: params.childId,
+        amount: -params.rewardPoints,
+        description: `${params.sourceLabel} 독서 대화 재도전 반환`,
+        type: "refund",
+        category: "reading_retry",
+      });
+      await tx.update(missionLogsTable)
+        .set({ status: "reverted" })
+        .where(eq(missionLogsTable.transactionId, params.transactionId));
     }
 
-    await tx.delete(readingAttemptsTable).where(eq(readingAttemptsTable.id, params.attemptId));
+    await tx.update(readingAttemptsTable)
+      .set({ status: "reset", resetAt: new Date(), resetReason: "child_retry" })
+      .where(eq(readingAttemptsTable.id, params.attemptId));
     return { ok: true as const };
   });
 }

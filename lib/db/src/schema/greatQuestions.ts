@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import { date, index, integer, jsonb, pgTable, serial, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
 import { childrenTable } from "./children";
 import { transactionsTable } from "./transactions";
@@ -29,7 +30,7 @@ export const greatQuestionSessionsTable = pgTable("great_question_sessions", {
   domainKey: text("domain_key").notNull(),
   domainLabel: text("domain_label").notNull(),
   scenario: text("scenario").notNull(),
-  status: text("status").notNull().$type<"in_progress" | "completed">().default("in_progress"),
+  status: text("status").notNull().$type<"in_progress" | "completed" | "reset">().default("in_progress"),
   childMessageCount: integer("child_message_count").notNull().default(0),
   rewardPoints: integer("reward_points").notNull().default(0),
   evaluation: jsonb("evaluation").$type<GreatQuestionEvaluation>(),
@@ -38,8 +39,10 @@ export const greatQuestionSessionsTable = pgTable("great_question_sessions", {
   transactionId: integer("transaction_id").references(() => transactionsTable.id, { onDelete: "set null" }),
   startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
   completedAt: timestamp("completed_at", { withTimezone: true }),
+  resetAt: timestamp("reset_at", { withTimezone: true }),
+  resetReason: text("reset_reason"),
 }, (table) => [
-  uniqueIndex("uq_great_question_child_date").on(table.childId, table.sessionDate),
+  uniqueIndex("uq_great_question_active_child_date").on(table.childId, table.sessionDate).where(sql`${table.status} <> 'reset'`),
   index("idx_great_question_child_status").on(table.childId, table.status),
 ]);
 

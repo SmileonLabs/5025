@@ -131,7 +131,7 @@ export interface QuizQuestion {
   correctIndex: number;
 }
 
-export type MissionLogStatus = "completed" | "requested" | "approved" | "rejected";
+export type MissionLogStatus = "completed" | "requested" | "approved" | "rejected" | "reverted";
 
 // 미션 수행 내역 1건 (GET /mission-logs). child는 부모 세션 응답에만 동봉.
 export interface MissionLog {

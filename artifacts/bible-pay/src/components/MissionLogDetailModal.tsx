@@ -8,6 +8,7 @@ const STATUS_BADGE: Record<MissionLog["status"], { label: string; cls: string }>
   approved: { label: "부모님 승인 완료", cls: "bg-green-50 text-green-700" },
   requested: { label: "승인 대기 중", cls: "bg-orange-50 text-orange-600" },
   rejected: { label: "반려됨", cls: "bg-red-50 text-red-500" },
+  reverted: { label: "재도전으로 반환됨", cls: "bg-slate-100 text-slate-600" },
 };
 
 const TYPE_LABEL: Record<string, string> = { bible: "성경읽기", activity: "활동미션" };
@@ -61,7 +62,7 @@ export function MissionLogDetailModal({ log, open, onClose, showChild = false }:
                   </div>
                   <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mt-1">{TYPE_LABEL[log.mission.type] ?? "미션"}</p>
                   <p className="font-bold text-gray-900 text-base leading-snug">{log.mission.title}</p>
-                  {log.status !== "rejected" && (
+                  {["completed", "approved"].includes(log.status) && (
                     <p className="text-3xl font-black tabular-nums text-emerald-500">+{log.rewardAmount.toLocaleString("ko-KR")}P</p>
                   )}
                   <span className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-bold ${STATUS_BADGE[log.status].cls}`} data-testid="log-status-badge">

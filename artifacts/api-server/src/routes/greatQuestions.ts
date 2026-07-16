@@ -30,7 +30,7 @@ router.get("/great-questions", requireChild, async (req, res) => {
   res.set("Cache-Control", "no-store");
   const childId = req.session.childId!;
   const [profile] = await db.select().from(greatQuestionProfilesTable).where(eq(greatQuestionProfilesTable.childId, childId)).limit(1);
-  const [session] = await db.select().from(greatQuestionSessionsTable).where(and(eq(greatQuestionSessionsTable.childId, childId), eq(greatQuestionSessionsTable.sessionDate, todayKst()))).limit(1);
+  const [session] = await db.select().from(greatQuestionSessionsTable).where(and(eq(greatQuestionSessionsTable.childId, childId), eq(greatQuestionSessionsTable.sessionDate, todayKst()), sql`${greatQuestionSessionsTable.status} <> 'reset'`)).limit(1);
   const messages = session ? await db.select().from(greatQuestionMessagesTable).where(eq(greatQuestionMessagesTable.sessionId, session.id)).orderBy(greatQuestionMessagesTable.createdAt) : [];
   res.json({ domains: DOMAINS, profile: profile ?? null, session: session ?? null, messages });
 });
@@ -77,7 +77,7 @@ router.put("/great-questions/profile", requireChild, async (req, res) => {
 
 router.post("/great-questions/sessions", requireChild, async (req, res) => {
   const childId = req.session.childId!;
-  const [existing] = await db.select().from(greatQuestionSessionsTable).where(and(eq(greatQuestionSessionsTable.childId, childId), eq(greatQuestionSessionsTable.sessionDate, todayKst()))).limit(1);
+  const [existing] = await db.select().from(greatQuestionSessionsTable).where(and(eq(greatQuestionSessionsTable.childId, childId), eq(greatQuestionSessionsTable.sessionDate, todayKst()), sql`${greatQuestionSessionsTable.status} <> 'reset'`)).limit(1);
   if (existing) {
     const messages = await db.select().from(greatQuestionMessagesTable).where(eq(greatQuestionMessagesTable.sessionId, existing.id)).orderBy(greatQuestionMessagesTable.createdAt);
     res.json({ session: existing, messages }); return;
@@ -151,9 +151,15 @@ router.post("/great-questions/sessions/:id/reset", requireChild, async (req, res
         .where(and(eq(childrenTable.id, row.child.id), gte(childrenTable.balance, row.session.rewardPoints))).returning();
       if (!child) return "spent" as const;
       await tx.update(parentsTable).set({ balance: sql`${parentsTable.balance} + ${row.session.rewardPoints}` }).where(eq(parentsTable.id, row.child.parentId));
-      await tx.delete(transactionsTable).where(eq(transactionsTable.id, row.session.transactionId));
+      await tx.insert(transactionsTable).values({
+        childId: row.child.id,
+        amount: -row.session.rewardPoints,
+        description: "위대한 질문 재도전 반환",
+        type: "refund",
+        category: "great_question_retry",
+      });
     }
-    await tx.delete(greatQuestionSessionsTable).where(eq(greatQuestionSessionsTable.id, id));
+    await tx.update(greatQuestionSessionsTable).set({ status: "reset", resetAt: new Date(), resetReason: "child_retry" }).where(eq(greatQuestionSessionsTable.id, id));
     return "reset" as const;
   });
   if (reset === "spent") { res.status(409).json({ error: "이미 사용한 포인트가 있어 다시 도전할 수 없어요." }); return; }

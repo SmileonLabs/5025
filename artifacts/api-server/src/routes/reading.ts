@@ -146,6 +146,9 @@ router.post("/reading/attempts/:id/reset", requireChild, async (req, res) => {
   const id = Number(req.params.id);
   const row = Number.isInteger(id) ? await ownedAttempt(id, req.session.childId!) : null;
   if (!row) { res.status(404).json({ error: "독서 대화를 찾을 수 없어요." }); return; }
+  if (!["completed", "failed"].includes(row.attempt.status)) {
+    res.status(409).json({ error: "끝난 독서 대화만 처음부터 다시 도전할 수 있어요." }); return;
+  }
   if (row.attempt.rewardPoints >= 2000) {
     res.status(409).json({ error: "2,000P를 받은 독서 대화는 최고 보상이라 다시 도전할 수 없어요." }); return;
   }
@@ -156,6 +159,7 @@ router.post("/reading/attempts/:id/reset", requireChild, async (req, res) => {
     parentId: row.mission.parentId,
     rewardPoints: row.attempt.rewardPoints,
     transactionId: row.attempt.transactionId,
+    sourceLabel: row.attempt.sourceLabel,
   });
   if (!reset.ok) { res.status(409).json({ error: "이미 사용한 포인트가 있어 다시 도전할 수 없어요." }); return; }
   res.json({ status: "reset" });

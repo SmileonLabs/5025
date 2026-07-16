@@ -6,6 +6,7 @@ const STATUS_BADGE: Record<MissionLog["status"], { label: string; cls: string }>
   approved: { label: "승인 완료", cls: "bg-green-100 text-green-700" },
   requested: { label: "승인 대기", cls: "bg-orange-100 text-orange-700" },
   rejected: { label: "반려", cls: "bg-red-100 text-red-600" },
+  reverted: { label: "재도전 반환", cls: "bg-slate-100 text-slate-600" },
 };
 
 const TYPE_EMOJI: Record<string, string> = { bible: "📖", activity: "🔍" };
@@ -79,9 +80,10 @@ export function MissionLogList({ logs, showChild = false, onSelect }: {
                       {showChild && log.child ? `${log.child.name} · ` : ""}{timeLabel(log.createdAt)}
                     </p>
                   </div>
-                  {log.status !== "rejected" && (
+                  {["completed", "approved"].includes(log.status) && (
                     <span className="text-sm font-black text-emerald-500 shrink-0 tabular-nums">+{log.rewardAmount.toLocaleString("ko-KR")}P</span>
                   )}
+                  {log.status === "reverted" && <span className="text-xs font-bold text-slate-500 shrink-0">포인트 반환</span>}
                   <ChevronRight className="w-4 h-4 text-gray-300 shrink-0" />
                 </button>
               );
