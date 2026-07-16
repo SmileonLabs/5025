@@ -53,3 +53,30 @@ export async function completeReadingReward(params: {
     throw error;
   }
 }
+
+export async function resetReadingAttempt(params: {
+  attemptId: number;
+  childId: number;
+  parentId: number;
+  rewardPoints: number;
+  transactionId: number | null;
+}) {
+  return db.transaction(async (tx) => {
+    if (params.transactionId && params.rewardPoints > 0) {
+      const [child] = await tx.update(childrenTable)
+        .set({ balance: sql`${childrenTable.balance} - ${params.rewardPoints}` })
+        .where(and(eq(childrenTable.id, params.childId), gte(childrenTable.balance, params.rewardPoints)))
+        .returning();
+      if (!child) return { ok: false as const, reason: "spent" as const };
+
+      await tx.update(parentsTable)
+        .set({ balance: sql`${parentsTable.balance} + ${params.rewardPoints}` })
+        .where(eq(parentsTable.id, params.parentId));
+      await tx.delete(missionLogsTable).where(eq(missionLogsTable.transactionId, params.transactionId));
+      await tx.delete(transactionsTable).where(eq(transactionsTable.id, params.transactionId));
+    }
+
+    await tx.delete(readingAttemptsTable).where(eq(readingAttemptsTable.id, params.attemptId));
+    return { ok: true as const };
+  });
+}

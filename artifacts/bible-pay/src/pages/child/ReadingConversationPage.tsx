@@ -20,6 +20,7 @@ type CompleteResponse = {
   canRetry?: boolean;
   evaluation: { reason: string };
 };
+type ResetResponse = { status: "reset" };
 
 export default function ReadingConversationPage() {
   const [, setLocation] = useLocation();
@@ -49,6 +50,7 @@ export default function ReadingConversationPage() {
   const [canComplete, setCanComplete] = useState(false);
   const [result, setResult] = useState<CompleteResponse | null>(null);
   const [startError, setStartError] = useState<string | null>(null);
+  const [resetting, setResetting] = useState(false);
   const started = useRef(false);
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -146,6 +148,26 @@ export default function ReadingConversationPage() {
     }
   };
 
+  const resetChallenge = async () => {
+    if (!attemptId || resetting) return;
+    const hasReward = result?.rewardPoints && result.rewardPoints > 0;
+    const confirmed = window.confirm(
+      hasReward
+        ? "받은 포인트를 부모님 지갑으로 돌려드리고 처음부터 다시 도전할까요? 아직 사용하지 않은 포인트일 때만 가능해요."
+        : "지금 대화를 지우고 처음부터 다시 도전할까요?",
+    );
+    if (!confirmed) return;
+    setResetting(true);
+    try {
+      await api.post<ResetResponse>(`/reading/attempts/${attemptId}/reset`, {});
+      setLocation(backPath);
+    } catch (error: any) {
+      toast({ title: error.message, variant: "destructive" });
+    } finally {
+      setResetting(false);
+    }
+  };
+
   return (
     <div className="min-h-[100dvh] bg-slate-50 flex flex-col">
       <header className="bg-white border-b px-4 py-3 flex items-center gap-3 sticky top-0 z-20">
@@ -183,6 +205,11 @@ export default function ReadingConversationPage() {
               <p className="text-xs font-black text-gray-500 mb-1">AI 선생님의 이야기</p>
               <p className="text-sm text-gray-700 leading-relaxed">{result.evaluation.reason}</p>
             </div>
+            {result.rewardPoints < 2000 && (
+              <button onClick={resetChallenge} disabled={resetting} className="mt-4 w-full rounded-xl border border-violet-300 bg-white text-violet-700 py-3 font-bold disabled:opacity-50">
+                {resetting ? "처음으로 돌아가는 중..." : "처음부터 다시 도전하기"}
+              </button>
+            )}
             <button onClick={() => setLocation(result.status === "completed" ? "/child/missions" : backPath)} className="mt-4 w-full rounded-xl bg-gray-900 text-white py-3 font-bold">{result.status === "completed" ? "미션으로 돌아가기" : "다시 읽고 도전하기"}</button>
           </section>
         )}

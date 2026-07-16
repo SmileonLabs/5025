@@ -7,7 +7,7 @@ import {
 } from "@workspace/db";
 import { readingFeatureFlags } from "../lib/featureFlags";
 import { createReadingReply, evaluateReadingConversation, moderateReadingMessage, pointsForEvaluation } from "../lib/readingConversation";
-import { completeReadingReward, failReadingAttempt } from "../lib/readingReward";
+import { completeReadingReward, failReadingAttempt, resetReadingAttempt } from "../lib/readingReward";
 
 const router = Router();
 
@@ -132,10 +132,33 @@ router.post("/reading/attempts/:id/complete", requireChild, async (req, res) => 
     await failReadingAttempt(id, evaluation, evaluation.reason);
     res.json({ status: "failed", rewardPoints: 0, canRetry: true, evaluation }); return;
   }
-  const points = Math.max(row.mission.minRewardPoints, Math.min(row.mission.maxRewardPoints, rawPoints));
+  // Older Bible missions may have been created with a 0P minimum. Bible
+  // reading always starts at 500P, regardless of that legacy setting.
+  const minPoints = row.mission.type === "bible" ? Math.max(500, row.mission.minRewardPoints) : row.mission.minRewardPoints;
+  const maxPoints = row.mission.type === "bible" ? Math.min(2000, row.mission.maxRewardPoints) : row.mission.maxRewardPoints;
+  const points = Math.max(minPoints, Math.max(minPoints, Math.min(maxPoints, rawPoints)));
   const result = await completeReadingReward({ attemptId: id, missionId: row.mission.id, parentId: row.mission.parentId, childId: row.child.id, readingUnitKey: row.attempt.readingUnitKey, rewardPoints: points, evaluation, description: `${row.attempt.sourceLabel} 독서 대화 완료` });
   if (!result.ok) { res.status(result.reason === "insufficient_parent" ? 402 : 409).json({ error: result.reason === "insufficient_parent" ? "부모님 포인트가 부족해 아직 완료되지 않았어요." : "이미 처리된 대화예요." }); return; }
   res.json({ status: "completed", rewardPoints: points, evaluation, childBalance: result.childBalance });
+});
+
+router.post("/reading/attempts/:id/reset", requireChild, async (req, res) => {
+  const id = Number(req.params.id);
+  const row = Number.isInteger(id) ? await ownedAttempt(id, req.session.childId!) : null;
+  if (!row) { res.status(404).json({ error: "독서 대화를 찾을 수 없어요." }); return; }
+  if (row.attempt.rewardPoints >= 2000) {
+    res.status(409).json({ error: "2,000P를 받은 독서 대화는 최고 보상이라 다시 도전할 수 없어요." }); return;
+  }
+
+  const reset = await resetReadingAttempt({
+    attemptId: row.attempt.id,
+    childId: row.child.id,
+    parentId: row.mission.parentId,
+    rewardPoints: row.attempt.rewardPoints,
+    transactionId: row.attempt.transactionId,
+  });
+  if (!reset.ok) { res.status(409).json({ error: "이미 사용한 포인트가 있어 다시 도전할 수 없어요." }); return; }
+  res.json({ status: "reset" });
 });
 
 router.get("/reading/attempts/:id", requireChild, async (req, res) => {
