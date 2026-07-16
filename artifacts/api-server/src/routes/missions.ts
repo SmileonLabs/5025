@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { z } from "zod";
-import { db, missionsTable, missionLogsTable, missionAssignmentsTable, childrenTable, transactionsTable, booksTable } from "@workspace/db";
+import { db, missionsTable, missionLogsTable, missionAssignmentsTable, childrenTable, transactionsTable, booksTable, greatQuestionSessionsTable } from "@workspace/db";
 import { eq, and, desc, inArray, sql, or, exists } from "drizzle-orm";
 import { sendPushToParent } from "../lib/push";
 import { grantBibleReward, approveActivityLog } from "../lib/missionReward";
@@ -528,13 +528,41 @@ router.get("/mission-logs", async (req, res) => {
       .leftJoin(transactionsTable, eq(missionLogsTable.transactionId, transactionsTable.id))
       .where(inArray(missionLogsTable.missionId, missionIds))
       .orderBy(desc(missionLogsTable.createdAt));
-    res.json(rows.map((r) => ({
+    const missionHistory = rows.map((r) => ({
       ...r.log,
       // 지급 완료(transaction 존재)면 실제 지급액, 아니면 미션 예정 보상
       rewardAmount: r.log.transactionId != null && r.txAmount != null ? r.txAmount : r.mission.reward,
       mission: { id: r.mission.id, title: r.mission.title, type: r.mission.type, reward: r.mission.reward, scheduleType: r.mission.scheduleType },
       child: { id: r.child.id, name: r.child.name, avatar: r.child.avatar },
-    })));
+    }));
+    const questionRows = await db
+      .select({ session: greatQuestionSessionsTable, child: childrenTable })
+      .from(greatQuestionSessionsTable)
+      .innerJoin(childrenTable, eq(greatQuestionSessionsTable.childId, childrenTable.id))
+      .where(and(
+        eq(childrenTable.parentId, req.session.parentId),
+        inArray(greatQuestionSessionsTable.status, ["completed", "reset"]),
+      ))
+      .orderBy(desc(greatQuestionSessionsTable.completedAt));
+    const questionHistory = questionRows.map((r) => ({
+      id: -r.session.id,
+      missionId: 0,
+      childId: r.child.id,
+      status: r.session.status === "reset" ? "reverted" as const : "completed" as const,
+      bibleBook: null,
+      bibleChapter: null,
+      reflection: [r.session.finalQuestion ?? r.session.evaluation?.greatQuestion, r.session.evaluation?.reason].filter(Boolean).join("\n\n"),
+      quiz: null,
+      photoUrl: null,
+      transactionId: r.session.transactionId,
+      requestedAt: r.session.startedAt,
+      approvedAt: r.session.completedAt,
+      createdAt: r.session.completedAt ?? r.session.startedAt,
+      rewardAmount: r.session.rewardPoints,
+      mission: { id: 0, title: "위대한 질문", type: "great_question", reward: r.session.rewardPoints, scheduleType: "daily" },
+      child: { id: r.child.id, name: r.child.name, avatar: r.child.avatar },
+    }));
+    res.json([...missionHistory, ...questionHistory].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
     return;
   }
   if (req.session?.childId) {

@@ -9,7 +9,7 @@ const STATUS_BADGE: Record<MissionLog["status"], { label: string; cls: string }>
   reverted: { label: "재도전 반환", cls: "bg-slate-100 text-slate-600" },
 };
 
-const TYPE_EMOJI: Record<string, string> = { bible: "📖", activity: "🔍" };
+const TYPE_EMOJI: Record<string, string> = { bible: "📖", activity: "🔍", book: "📚", great_question: "💡" };
 
 function dayKey(dateStr: string): string {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Seoul", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(dateStr));

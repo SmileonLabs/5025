@@ -150,7 +150,7 @@ export interface MissionLog {
   createdAt: string;
   // 지급 완료면 실제 지급액, 아니면 미션 예정 보상
   rewardAmount: number;
-  mission: { id: number; title: string; type: MissionType; reward: number; scheduleType: MissionScheduleType };
+  mission: { id: number; title: string; type: MissionType | "great_question"; reward: number; scheduleType: MissionScheduleType };
   child?: { id: number; name: string; avatar: string };
 }
 

@@ -11,7 +11,7 @@ const STATUS_BADGE: Record<MissionLog["status"], { label: string; cls: string }>
   reverted: { label: "재도전으로 반환됨", cls: "bg-slate-100 text-slate-600" },
 };
 
-const TYPE_LABEL: Record<string, string> = { bible: "성경읽기", activity: "활동미션" };
+const TYPE_LABEL: Record<string, string> = { bible: "성경읽기", activity: "활동미션", book: "독서 미션", great_question: "위대한 질문" };
 
 interface Props {
   log: MissionLog | null;
